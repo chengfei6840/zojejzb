@@ -1,0 +1,12 @@
+{
+  "name": "机针云掌柜控制系统",
+  "description": "基于中捷视觉识别技术的智能化机针回收、换新及库存管理系统看板。",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "Machine Vision Interface",
+    "Inventory Management",
+    "Face Recognition Authentication"
+  ]
+}
