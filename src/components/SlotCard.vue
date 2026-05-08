@@ -28,19 +28,19 @@ const displayNumber = computed(() => Number.parseInt(props.slot.number, 10) || 0
     </div>
 
     <div v-if="slot.needleType" class="flex-1 flex items-center gap-2 min-h-0 py-0.5">
-      <div class="flex-1 text-[9px] leading-[1.2] text-gray-800 space-y-0.5">
-        <p><span class="text-gray-500">机针型号：</span><span class="font-semibold">{{ slot.needleType }}</span></p>
-        <p><span class="text-gray-500">针号：</span><span class="font-semibold">{{ slot.needleNo }}</span></p>
-        <p><span class="text-gray-500">针尖：</span><span class="font-semibold">{{ slot.needleTip }}</span></p>
-        <p><span class="text-gray-500">机针名称：</span><span class="font-semibold">{{ slot.needleName || slot.model }}</span></p>
-        <p><span class="text-gray-500">机针用途：</span><span class="font-semibold">{{ slot.usage }}</span></p>
-        <p><span class="text-gray-500">品牌：</span><span class="font-semibold">{{ slot.brand }}</span></p>
+      <div class="flex-1 text-[10px] leading-[1.2] text-gray-800 space-y-0.5">
+        <p class="whitespace-nowrap overflow-hidden text-ellipsis"><span class="text-gray-500">机针型号：</span><span class="font-semibold">{{ slot.needleType }}</span></p>
+        <p class="whitespace-nowrap overflow-hidden text-ellipsis"><span class="text-gray-500">针号：</span><span class="font-semibold">{{ slot.needleNo }}</span></p>
+        <p class="whitespace-nowrap overflow-hidden text-ellipsis"><span class="text-gray-500">针尖：</span><span class="font-semibold">{{ slot.needleTip }}</span></p>
+        <p class="whitespace-nowrap overflow-hidden text-ellipsis"><span class="text-gray-500">机针名称：</span><span class="font-semibold">{{ slot.needleName || slot.model }}</span></p>
+        <p class="whitespace-nowrap overflow-hidden text-ellipsis"><span class="text-gray-500">机针用途：</span><span class="font-semibold">{{ slot.usage }}</span></p>
+        <p class="whitespace-nowrap overflow-hidden text-ellipsis"><span class="text-gray-500">品牌：</span><span class="font-semibold">{{ slot.brand }}</span></p>
       </div>
       <img
         v-if="slot.image"
         :src="slot.image"
         alt="Sewing Machine"
-        class="w-[92px] h-[54px] object-contain flex-shrink-0 opacity-95"
+        class="w-[102px] h-[60px] object-contain flex-shrink-0 opacity-95"
       />
     </div>
     <div v-else class="flex-1 flex flex-col items-center justify-center opacity-30 my-0">
@@ -48,7 +48,7 @@ const displayNumber = computed(() => Number.parseInt(props.slot.number, 10) || 0
       <span class="text-[8px] font-bold text-gray-400 mt-1 uppercase">Empty</span>
     </div>
 
-    <div class="absolute right-2.5 bottom-2 text-[9px] font-semibold text-gray-500">
+    <div class="absolute right-2.5 bottom-2 text-[10px] font-semibold text-gray-500">
       库存：20
     </div>
 

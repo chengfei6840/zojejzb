@@ -154,7 +154,7 @@ const closeProcess = () => {
         </div>
 
         <!-- Grid -->
-        <div class="flex-1 grid grid-cols-5 grid-rows-6 gap-2 min-h-0 pb-0">
+        <div class="flex-1 grid grid-cols-6 grid-rows-5 gap-2 min-h-0 pb-0">
           <SlotCard 
             v-for="slot in MOCK_SLOTS" 
             :key="slot.id" 
