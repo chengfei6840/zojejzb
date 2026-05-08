@@ -1,5 +1,7 @@
 import { NeedleSlot } from './types';
 
+const SEWING_MACHINE_IMAGE = `${import.meta.env.BASE_URL}assets/sewing-machine.png`;
+
 export const MOCK_SLOTS: NeedleSlot[] = Array.from({ length: 30 }, (_, i) => {
   const num = (i + 1).toString().padStart(2, '0');
   let count = 14;
@@ -23,7 +25,7 @@ export const MOCK_SLOTS: NeedleSlot[] = Array.from({ length: 30 }, (_, i) => {
     status,
     needleType: 'DBx1HS',
     model: 'A8200L平车',
-    image: '/assets/sewing-machine.png',
+    image: SEWING_MACHINE_IMAGE,
     needleNo: '90/14#',
     needleTip: 'R/SET',
     needleName: 'A8200L平车',
