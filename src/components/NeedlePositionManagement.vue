@@ -3,10 +3,6 @@ import { computed, reactive, ref } from 'vue';
 import { Check, Download, Pencil, RotateCcw, Search, Trash2, Upload, X } from 'lucide-vue-next';
 import type { NeedlePositionRecord } from '../types';
 
-const emit = defineEmits<{
-  (e: 'back'): void;
-}>();
-
 type NeedleOption = {
   id: string;
   name: string;
@@ -347,7 +343,6 @@ const importPositions = (event: Event) => {
       <div>
         <h1>针位管理</h1>
       </div>
-      <button type="button" class="org-back" @click="emit('back')">返回系统</button>
     </div>
 
     <section class="org-list-card needle-position-card">

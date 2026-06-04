@@ -22,10 +22,6 @@ interface UserRecord {
   needleIds: string[];
 }
 
-const emit = defineEmits<{
-  (e: 'back'): void;
-}>();
-
 const factories = [
   { id: 'factory-1', name: '中捷一厂' },
   { id: 'factory-2', name: '中捷二厂' },
@@ -342,7 +338,6 @@ const startFaceRecognition = () => {
       <div>
         <h1>用户管理</h1>
       </div>
-      <button type="button" class="org-back" @click="emit('back')">返回系统</button>
     </div>
 
     <div class="org-layout user-layout">

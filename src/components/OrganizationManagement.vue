@@ -20,10 +20,6 @@ interface TeamRecord extends FactoryRecord {
   workshopId: string;
 }
 
-const emit = defineEmits<{
-  (e: 'back'): void;
-}>();
-
 const activeType = ref<OrgType>('factory');
 const editingId = ref<string | null>(null);
 
@@ -176,7 +172,6 @@ resetForm();
           <span>{{ tab.label }}</span>
         </button>
       </div>
-      <button type="button" class="org-back" @click="emit('back')">返回系统</button>
     </div>
 
     <div class="org-layout">

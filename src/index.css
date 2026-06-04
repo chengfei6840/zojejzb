@@ -1772,6 +1772,65 @@
   accent-color: #18b365;
 }
 
+.management-modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 108;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 34px;
+  background: rgba(17, 24, 39, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.management-modal-card {
+  position: relative;
+  width: min(1680px, calc(100vw - 68px));
+  height: min(900px, calc(100vh - 68px));
+  border-radius: 18px;
+  border: 1px solid #d8e3ea;
+  background: #f3f8fc;
+  box-shadow: 0 24px 62px rgba(15, 23, 42, 0.36);
+  overflow: hidden;
+}
+
+.management-modal-close {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  z-index: 5;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #475467;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(18, 30, 42, 0.14);
+}
+
+.management-modal-close:hover {
+  color: #1f2937;
+}
+
+.management-modal-body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.management-modal-body .org-page {
+  height: 100%;
+  padding: 28px 34px 32px;
+}
+
+.management-modal-body .org-header {
+  padding-right: 66px;
+}
+
 .hidden-file-input {
   display: none;
 }
@@ -1856,6 +1915,101 @@
 
 .login-modal-body {
   padding: 28px 38px 32px;
+}
+
+.operation-modal-card {
+  width: min(980px, calc(100vw - 96px));
+  border-radius: 24px;
+  background: #f3f7fb;
+}
+
+.operation-modal-card .login-modal-header {
+  height: 92px;
+  padding: 0 38px;
+}
+
+.operation-modal-card .login-title-mark {
+  width: 10px;
+  height: 48px;
+  border-radius: 3px;
+  background: #16b36b;
+}
+
+.operation-modal-card .login-modal-header h2 {
+  color: #161d2d;
+  font-size: 30px;
+  font-weight: 400;
+}
+
+.operation-modal-card .login-close-button {
+  color: #98a2b3;
+}
+
+.operation-modal-card .login-modal-body {
+  padding: 30px 38px 34px;
+}
+
+.operation-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, 152px);
+  gap: 18px;
+}
+
+.operation-card {
+  min-width: 0;
+  height: 152px;
+  border: 1px solid #edf1f4;
+  border-radius: 14px;
+  background: #fff;
+  color: #3f464d;
+  box-shadow: 0 3px 5px rgba(18, 30, 42, 0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.operation-card:hover {
+  border-color: var(--color-zoje-green);
+  box-shadow: 0 6px 16px rgba(18, 30, 42, 0.16);
+  transform: translateY(-1px);
+}
+
+.operation-icon-ring {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: 2px solid #edf5ef;
+  color: #38c760;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.operation-card:hover .operation-icon-ring {
+  border-color: #c9efd6;
+  background: #f2fff6;
+}
+
+.operation-icon-ring svg {
+  width: 52px;
+  height: 52px;
+}
+
+.operation-card span {
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.operation-card > span:last-child {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
 }
 
 .login-field {

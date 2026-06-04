@@ -7,10 +7,12 @@ import type { AppView } from '../types';
 interface Props {
   currentView: AppView;
   userName?: string;
+  activeAction?: string | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  userName: "管理员"
+  userName: "管理员",
+  activeAction: 'exchange',
 });
 
 const emit = defineEmits<{
@@ -39,7 +41,7 @@ const navItems = computed(() => props.currentView === 'dashboard' ? dashboardNav
 
 const isNavActive = (item: typeof dashboardNavItems[number] | typeof sectionNavItems[number]) => {
   if (props.currentView === 'dashboard') {
-    return item.label === '换针';
+    return Boolean(item.action && item.action === props.activeAction);
   }
   if (item.view === 'management' && ['needle', 'needlePosition', 'organization', 'role', 'user'].includes(props.currentView)) {
     return true;

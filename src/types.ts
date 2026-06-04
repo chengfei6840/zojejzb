@@ -53,16 +53,17 @@ export type AppView = 'dashboard' | 'management' | 'needle' | 'needlePosition' |
 
 export type ProcessPhase = 
   | 'idle' 
-  /** 换针流程（首页 8 步） */
-  | 'exchange_put_needle'
-  | 'exchange_click_action'
-  | 'exchange_face_primary'
+  /** 换针流程 */
   | 'exchange_select_slot'
   | 'exchange_face_secondary'
+  | 'dispense_operation_select'
+  | 'dispense_ready'
   | 'face_recognition' 
   | 'select_equipment' 
   | 'select_reason' 
   | 'vision_processing' 
+  | 'recognition_failed'
+  | 'wrapping'
   | 'quantity_input' 
   | 'dispensing' 
   | 'complete';

@@ -10,10 +10,6 @@ interface RoleRecord {
   permissions: string[];
 }
 
-const emit = defineEmits<{
-  (e: 'back'): void;
-}>();
-
 const permissionGroups = [
   { title: '首页操作', items: ['换针', '还针', '领针', '补充', '清理'] },
   { title: '报表权限', items: ['查看报表', '导出报表'] },
@@ -146,7 +142,6 @@ const savePermission = () => {
       <div>
         <h1>角色管理</h1>
       </div>
-      <button type="button" class="org-back" @click="emit('back')">返回系统</button>
     </div>
 
     <div class="org-layout role-layout">

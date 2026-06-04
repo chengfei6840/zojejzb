@@ -5,6 +5,7 @@ import { cn } from '../lib/utils';
 
 interface Props {
   slot: NeedleSlot;
+  selected?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -25,7 +26,7 @@ const countTone = computed(() => {
     @click="emit('click', slot)"
     :class="cn(
       'slot-card',
-      displayNumber === 1 && 'selected'
+      selected && 'selected'
     )"
   >
     <div class="slot-badge">

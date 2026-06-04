@@ -29,6 +29,7 @@ import {
   UserCheck,
   UserCog,
   UsersRound,
+  X,
 } from 'lucide-vue-next';
 import Header from '../components/Header.vue';
 import SlotCard from '../components/SlotCard.vue';
@@ -39,24 +40,67 @@ import NeedlePositionManagement from '../components/NeedlePositionManagement.vue
 import OrganizationManagement from '../components/OrganizationManagement.vue';
 import RoleManagement from '../components/RoleManagement.vue';
 import UserManagement from '../components/UserManagement.vue';
-import { EXCHANGE_REASONS, MOCK_SLOTS } from '../constants';
+import { EXCHANGE_REASONS, MOCK_SLOTS, RETURN_REASONS } from '../constants';
 import type { AppView, NeedleSlot, ProcessPhase } from '../types';
 import { cn } from '../lib/utils';
 
+interface ExchangeReportRow {
+  id: string;
+  time: string;
+  user: string;
+  slotNumber: string;
+  needleModel: string;
+  quantity: number;
+  reason: string;
+  status: 'COMPLETED';
+}
+
 const currentView = ref<AppView>('dashboard');
-const activeProcess = ref<{type: any, phase: ProcessPhase}>({ type: null, phase: 'idle' });
+type ProcessType = 'exchange' | 'return' | 'dispense' | 'replenish' | 'clear' | null;
+
+const activeProcess = ref<{type: ProcessType, phase: ProcessPhase}>({ type: 'exchange', phase: 'exchange_select_slot' });
+const slots = ref<NeedleSlot[]>(MOCK_SLOTS.map((slot) => ({ ...slot })));
 const selectedSlot = ref<NeedleSlot | null>(null);
+const selectedExchangeReason = ref('');
+const selectedReturnReason = ref('');
+const dispenseQuantity = ref(1);
 const selectedReport = ref<'exchange' | 'replenish' | 'dispense' | 'return' | 'spare'>('exchange');
 const isLoginOpen = ref(false);
+const managementModal = ref<AppView | null>(null);
+const exchangeCompleted = ref(false);
+const returnCompleted = ref(false);
+const exchangeReports = ref<ExchangeReportRow[]>([
+  { id: 'exchange-1', time: '2026-04-24 10:30:45', user: '管理员', slotNumber: '02', needleModel: 'DBx1HS 90/14#', quantity: 1, reason: '断针', status: 'COMPLETED' },
+  { id: 'exchange-2', time: '2026-04-24 10:28:12', user: '管理员', slotNumber: '05', needleModel: 'DBx1HS 90/14#', quantity: 1, reason: '弯曲', status: 'COMPLETED' },
+]);
+const returnReports = ref<ExchangeReportRow[]>([
+  { id: 'return-1', time: '2026-04-24 10:45:10', user: '管理员', slotNumber: '03', needleModel: 'DBx1HS 90/14#', quantity: 1, reason: '订单结束', status: 'COMPLETED' },
+  { id: 'return-2', time: '2026-04-24 10:40:28', user: '管理员', slotNumber: '07', needleModel: 'DBx1HS 90/14#', quantity: 1, reason: '领用冗余', status: 'COMPLETED' },
+]);
 
 const stats = computed(() => ({
-  total: 30,
-  available: 22,
-  low: 6,
-  empty: 2,
+  total: slots.value.length,
+  available: slots.value.filter((slot) => slot.count > 9).length,
+  low: slots.value.filter((slot) => slot.count > 0 && slot.count <= 9).length,
+  empty: slots.value.filter((slot) => slot.count === 0).length,
 }));
 
-const visibleSlots = computed(() => MOCK_SLOTS.slice(0, 12));
+const visibleSlots = computed(() => slots.value.slice(0, 12));
+const isNeedleReturnLikeProcess = computed(() => activeProcess.value.type === 'exchange' || activeProcess.value.type === 'return');
+const isNeedleReturnLikeSlotSelection = computed(() => (
+  currentView.value === 'dashboard'
+  && isNeedleReturnLikeProcess.value
+  && activeProcess.value.phase === 'exchange_select_slot'
+));
+
+const resetNeedleReturnLikeSelection = (type: 'exchange' | 'return' = 'exchange') => {
+  selectedSlot.value = null;
+  selectedExchangeReason.value = '';
+  selectedReturnReason.value = '';
+  exchangeCompleted.value = false;
+  returnCompleted.value = false;
+  activeProcess.value = { type, phase: 'exchange_select_slot' };
+};
 
 const managementSections = [
   {
@@ -96,34 +140,139 @@ const managementSections = [
 ];
 
 const EXCHANGE_PHASE_ORDER: ProcessPhase[] = [
-  'exchange_put_needle',
-  'exchange_click_action',
-  'exchange_face_primary',
   'exchange_select_slot',
   'exchange_face_secondary',
   'select_reason',
   'vision_processing',
+  'wrapping',
   'dispensing',
   'complete',
 ];
 
+const RETURN_PHASE_ORDER: ProcessPhase[] = [
+  'exchange_select_slot',
+  'exchange_face_secondary',
+  'select_reason',
+  'vision_processing',
+  'wrapping',
+  'complete',
+];
+
+const updateSlotStatus = (count: number): NeedleSlot['status'] => {
+  if (count === 0) return 'empty';
+  if (count <= 9) return 'low';
+  return 'available';
+};
+
+const resetDispenseSelection = () => {
+  selectedSlot.value = null;
+  dispenseQuantity.value = 1;
+};
+
+const formatDateTime = (date: Date) => {
+  const pad = (value: number) => value.toString().padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+};
+
+const completeExchange = () => {
+  if (!selectedSlot.value || exchangeCompleted.value) return;
+
+  const nextSlots = slots.value.map((slot) => {
+    if (slot.id !== selectedSlot.value?.id) return slot;
+    const nextCount = Math.max(0, slot.count - 1);
+    return {
+      ...slot,
+      count: nextCount,
+      status: updateSlotStatus(nextCount),
+    };
+  });
+  slots.value = nextSlots;
+
+  const completedSlot = nextSlots.find((slot) => slot.id === selectedSlot.value?.id);
+  exchangeReports.value.unshift({
+    id: `exchange-${Date.now()}`,
+    time: formatDateTime(new Date()),
+    user: '管理员',
+    slotNumber: completedSlot?.number ?? selectedSlot.value.number,
+    needleModel: `${completedSlot?.needleType ?? selectedSlot.value.needleType ?? ''} ${completedSlot?.needleNo ?? selectedSlot.value.needleNo ?? ''}`.trim(),
+    quantity: 1,
+    reason: selectedExchangeReason.value || '其他',
+    status: 'COMPLETED',
+  });
+  exchangeCompleted.value = true;
+};
+
+const completeReturn = () => {
+  if (!selectedSlot.value || returnCompleted.value) return;
+
+  returnReports.value.unshift({
+    id: `return-${Date.now()}`,
+    time: formatDateTime(new Date()),
+    user: '管理员',
+    slotNumber: selectedSlot.value.number,
+    needleModel: `${selectedSlot.value.needleType ?? ''} ${selectedSlot.value.needleNo ?? ''}`.trim(),
+    quantity: 1,
+    reason: selectedReturnReason.value || '其他',
+    status: 'COMPLETED',
+  });
+  returnCompleted.value = true;
+};
+
+const completeDispense = () => {
+  if (!selectedSlot.value) return;
+
+  const quantity = Math.min(Math.max(1, dispenseQuantity.value), selectedSlot.value.count);
+  slots.value = slots.value.map((slot) => {
+    if (slot.id !== selectedSlot.value?.id) return slot;
+    const nextCount = Math.max(0, slot.count - quantity);
+    return {
+      ...slot,
+      count: nextCount,
+      status: updateSlotStatus(nextCount),
+    };
+  });
+};
+
 const handleAction = (type: string) => {
-  if (type === 'exchange') {
-    activeProcess.value = { type, phase: 'exchange_put_needle' };
+  if (type === 'exchange' || type === 'return') {
+    resetNeedleReturnLikeSelection(type);
     return;
   }
-  activeProcess.value = { type, phase: 'face_recognition' };
+  if (type === 'dispense') {
+    resetDispenseSelection();
+    activeProcess.value = { type: 'dispense', phase: 'dispense_operation_select' };
+    return;
+  }
+  activeProcess.value = { type: type as ProcessType, phase: 'face_recognition' };
 };
 
 const handleNextPhase = () => {
   const { type, phase } = activeProcess.value;
 
-  if (type === 'exchange') {
-    const idx = EXCHANGE_PHASE_ORDER.indexOf(phase);
-    if (idx >= 0 && idx < EXCHANGE_PHASE_ORDER.length - 1) {
-      activeProcess.value = { ...activeProcess.value, phase: EXCHANGE_PHASE_ORDER[idx + 1] };
+  if (type === 'exchange' || type === 'return') {
+    const phaseOrder = type === 'exchange' ? EXCHANGE_PHASE_ORDER : RETURN_PHASE_ORDER;
+    const idx = phaseOrder.indexOf(phase);
+    if (idx >= 0 && idx < phaseOrder.length - 1) {
+      if (phase === 'dispensing') {
+        completeExchange();
+      }
+      if (type === 'return' && phase === 'wrapping') {
+        completeReturn();
+      }
+      activeProcess.value = { ...activeProcess.value, phase: phaseOrder[idx + 1] };
     }
     return;
+  }
+
+  if (type === 'dispense') {
+    if (phase === 'dispense_operation_select') {
+      activeProcess.value = { type, phase: 'face_recognition' };
+      return;
+    }
+    if (phase === 'face_recognition') {
+      activeProcess.value = { type, phase: 'dispense_ready' };
+      return;
+    }
   }
 
   const phases: ProcessPhase[] = [
@@ -140,8 +289,11 @@ const handleNextPhase = () => {
   let nextIdx = currentIdx + 1;
   
   if (type === 'dispense') {
-    if (phase === 'select_equipment') {
-      nextIdx = phases.indexOf('quantity_input');
+    if (phase === 'quantity_input') {
+      nextIdx = phases.indexOf('dispensing');
+    }
+    if (phase === 'dispensing') {
+      completeDispense();
     }
   }
 
@@ -158,19 +310,82 @@ const handleNextPhase = () => {
 
 const onViewChange = (view: AppView) => {
   currentView.value = view;
+  managementModal.value = null;
+  if (view === 'dashboard') {
+    resetNeedleReturnLikeSelection();
+    return;
+  }
+  activeProcess.value = { type: null, phase: 'idle' };
+  selectedSlot.value = null;
+  selectedExchangeReason.value = '';
+  selectedReturnReason.value = '';
+  dispenseQuantity.value = 1;
+  exchangeCompleted.value = false;
+  returnCompleted.value = false;
 };
 
 const onSlotClick = (slot: NeedleSlot) => {
+  if (currentView.value === 'dashboard' && activeProcess.value.type === 'dispense' && activeProcess.value.phase === 'dispense_ready') {
+    selectedSlot.value = slot;
+    dispenseQuantity.value = slot.count > 0 ? 1 : 0;
+    activeProcess.value = { type: 'dispense', phase: 'quantity_input' };
+    return;
+  }
+  if (isNeedleReturnLikeSlotSelection.value) {
+    selectedSlot.value = slot;
+    activeProcess.value = { type: activeProcess.value.type, phase: 'exchange_face_secondary' };
+    return;
+  }
   selectedSlot.value = slot;
 };
 
-const onExchangeSelectSlot = (slot: NeedleSlot) => {
+const onNeedleReturnLikeSelectSlot = (slot: NeedleSlot) => {
   selectedSlot.value = slot;
   handleNextPhase();
 };
 
+const selectedProcessReason = computed(() => {
+  if (activeProcess.value.type === 'return') return selectedReturnReason.value;
+  return selectedExchangeReason.value;
+});
+
+const onProcessReasonSelect = (reason: string) => {
+  if (activeProcess.value.type === 'return') {
+    selectedReturnReason.value = reason;
+    return;
+  }
+  selectedExchangeReason.value = reason;
+};
+
+const onExchangeRecognitionFailed = () => {
+  selectedSlot.value = null;
+  selectedExchangeReason.value = '';
+  selectedReturnReason.value = '';
+  activeProcess.value = { type: activeProcess.value.type, phase: 'recognition_failed' };
+};
+
+const restartExchangeFromSlot = () => {
+  resetNeedleReturnLikeSelection(activeProcess.value.type === 'return' ? 'return' : 'exchange');
+};
+
 const closeProcess = () => {
+  if (currentView.value === 'dashboard' && isNeedleReturnLikeProcess.value) {
+    resetNeedleReturnLikeSelection(activeProcess.value.type === 'return' ? 'return' : 'exchange');
+    return;
+  }
+  if (currentView.value === 'dashboard' && activeProcess.value.type === 'dispense') {
+    const shouldReturnToDispensePage = ['quantity_input', 'dispensing', 'complete'].includes(activeProcess.value.phase);
+    resetDispenseSelection();
+    activeProcess.value = { type: 'dispense', phase: shouldReturnToDispensePage ? 'dispense_ready' : 'idle' };
+    return;
+  }
   activeProcess.value = { type: null, phase: 'idle' };
+  selectedSlot.value = null;
+  selectedExchangeReason.value = '';
+  selectedReturnReason.value = '';
+  dispenseQuantity.value = 1;
+  exchangeCompleted.value = false;
+  returnCompleted.value = false;
 };
 
 const closeLogin = () => {
@@ -179,8 +394,12 @@ const closeLogin = () => {
 
 const onSystemItemClick = (item: { view?: AppView }) => {
   if (item.view) {
-    currentView.value = item.view;
+    managementModal.value = item.view;
   }
+};
+
+const closeManagementModal = () => {
+  managementModal.value = null;
 };
 </script>
 
@@ -188,6 +407,7 @@ const onSystemItemClick = (item: { view?: AppView }) => {
   <div class="h-screen w-screen flex flex-col bg-gray-50 overflow-hidden">
     <Header 
       :current-view="currentView" 
+      :active-action="activeProcess.type"
       @view-change="onViewChange" 
       @action="handleAction"
       @login="isLoginOpen = true"
@@ -240,6 +460,7 @@ const onSystemItemClick = (item: { view?: AppView }) => {
             v-for="slot in visibleSlots" 
             :key="slot.id" 
             :slot="slot" 
+            :selected="!isNeedleReturnLikeSlotSelection && selectedSlot?.id === slot.id"
             @click="onSlotClick" 
           />
         </div>
@@ -277,31 +498,6 @@ const onSystemItemClick = (item: { view?: AppView }) => {
           </div>
         </section>
       </div>
-
-      <OrganizationManagement
-        v-else-if="currentView === 'organization'"
-        @back="currentView = 'management'"
-      />
-
-      <NeedleManagement
-        v-else-if="currentView === 'needle'"
-        @back="currentView = 'management'"
-      />
-
-      <NeedlePositionManagement
-        v-else-if="currentView === 'needlePosition'"
-        @back="currentView = 'management'"
-      />
-
-      <RoleManagement
-        v-else-if="currentView === 'role'"
-        @back="currentView = 'management'"
-      />
-
-      <UserManagement
-        v-else-if="currentView === 'user'"
-        @back="currentView = 'management'"
-      />
 
       <!-- Reporting View -->
       <div v-else-if="currentView === 'reporting'" class="h-full overflow-y-auto max-w-[1800px] mx-auto py-2 pb-1 pr-2">
@@ -362,20 +558,33 @@ const onSystemItemClick = (item: { view?: AppView }) => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]" :key="i" class="border-b border-gray-50 hover:bg-green-50/20 transition-colors">
-                  <td class="px-6 py-3 text-sm font-medium text-gray-500">2026-04-24 10:30:{{i}}2</td>
-                  <td class="px-6 py-3 text-sm font-bold text-gray-800">管理员</td>
-                  <td class="px-6 py-3 text-sm font-mono text-[var(--color-zoje-green)] font-black">
-                    {{ selectedReport === 'spare' ? '备用仓' : `#${i.toString().padStart(2, '0')}` }}
+                <tr
+                  v-for="i in selectedReport === 'exchange' ? exchangeReports : selectedReport === 'return' ? returnReports : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
+                  :key="typeof i === 'number' ? i : i.id"
+                  class="border-b border-gray-50 hover:bg-green-50/20 transition-colors"
+                >
+                  <td class="px-6 py-3 text-sm font-medium text-gray-500">
+                    {{ typeof i === 'number' ? `2026-04-24 10:30:${i}2` : i.time }}
                   </td>
-                  <td class="px-6 py-3 text-sm font-bold text-gray-700">DB×1HS 90/14#</td>
-                  <td class="px-6 py-3 text-sm font-black text-gray-800">1</td>
+                  <td class="px-6 py-3 text-sm font-bold text-gray-800">
+                    {{ typeof i === 'number' ? '管理员' : i.user }}
+                  </td>
+                  <td class="px-6 py-3 text-sm font-mono text-[var(--color-zoje-green)] font-black">
+                    {{ typeof i === 'number' ? (selectedReport === 'spare' ? '备用仓' : `#${i.toString().padStart(2, '0')}`) : `#${i.slotNumber}` }}
+                  </td>
+                  <td class="px-6 py-3 text-sm font-bold text-gray-700">
+                    {{ typeof i === 'number' ? 'DB×1HS 90/14#' : i.needleModel }}
+                  </td>
+                  <td class="px-6 py-3 text-sm font-black text-gray-800">
+                    {{ typeof i === 'number' ? 1 : i.quantity }}
+                  </td>
                   <td class="px-6 py-3 text-sm font-medium text-gray-400">
                     {{ 
+                      typeof i !== 'number' ? i.reason :
                       selectedReport === 'exchange' ? EXCHANGE_REASONS[i % EXCHANGE_REASONS.length] : 
                       selectedReport === 'replenish' ? '外购进库' :
                       selectedReport === 'dispense' ? '生产领用' :
-                      selectedReport === 'return' ? '订单结束' : '出库' 
+                      selectedReport === 'return' ? RETURN_REASONS[i % RETURN_REASONS.length] : '出库'
                     }}
                   </td>
                   <td class="px-6 py-3 text-right">
@@ -396,14 +605,36 @@ const onSystemItemClick = (item: { view?: AppView }) => {
       </div>
     </main>
 
+    <div v-if="managementModal" class="management-modal-layer">
+      <section class="management-modal-card">
+        <button type="button" class="management-modal-close" @click="closeManagementModal">
+          <X :size="32" :stroke-width="2.2" />
+        </button>
+        <div class="management-modal-body">
+          <OrganizationManagement v-if="managementModal === 'organization'" />
+          <NeedleManagement v-else-if="managementModal === 'needle'" />
+          <NeedlePositionManagement v-else-if="managementModal === 'needlePosition'" />
+          <RoleManagement v-else-if="managementModal === 'role'" />
+          <UserManagement v-else-if="managementModal === 'user'" />
+        </div>
+      </section>
+    </div>
+
     <ProcessModal 
       :phase="activeProcess.phase" 
       :type="activeProcess.type" 
       :selected-slot="selectedSlot"
-      :slots="MOCK_SLOTS"
+      :selected-reason="selectedProcessReason"
+      :dispense-quantity="dispenseQuantity"
+      :slots="slots"
+      :is-admin="true"
       @close="closeProcess"
       @next="handleNextPhase"
-      @exchange-select-slot="onExchangeSelectSlot"
+      @exchange-select-slot="onNeedleReturnLikeSelectSlot"
+      @reason-select="onProcessReasonSelect"
+      @dispense-quantity-change="dispenseQuantity = $event"
+      @recognition-failed="onExchangeRecognitionFailed"
+      @restart-exchange-from-slot="restartExchangeFromSlot"
     />
 
     <LoginModal

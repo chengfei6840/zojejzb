@@ -3,10 +3,6 @@ import { computed, onBeforeUnmount, reactive, ref } from 'vue';
 import { Download, ImagePlus, Loader2, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-vue-next';
 import type { NeedleRecord } from '../types';
 
-const emit = defineEmits<{
-  (e: 'back'): void;
-}>();
-
 const DEFAULT_IMAGE = `${import.meta.env.BASE_URL}assets/sewing-machine-wide.png`;
 
 const createTimeText = () => {
@@ -345,7 +341,6 @@ resetForm();
       <div>
         <h1>机针管理</h1>
       </div>
-      <button type="button" class="org-back" @click="emit('back')">返回系统</button>
     </div>
 
     <div class="org-layout needle-layout">
