@@ -57,6 +57,7 @@ interface ExchangeReportRow {
 
 const currentView = ref<AppView>('dashboard');
 type ProcessType = 'exchange' | 'return' | 'dispense' | 'replenish' | 'clear' | null;
+type DispenseMode = 'direct' | 'authorized' | null;
 
 const activeProcess = ref<{type: ProcessType, phase: ProcessPhase}>({ type: 'exchange', phase: 'exchange_select_slot' });
 const slots = ref<NeedleSlot[]>(MOCK_SLOTS.map((slot) => ({ ...slot })));
@@ -64,6 +65,8 @@ const selectedSlot = ref<NeedleSlot | null>(null);
 const selectedExchangeReason = ref('');
 const selectedReturnReason = ref('');
 const dispenseQuantity = ref(1);
+const dispenseMode = ref<DispenseMode>(null);
+const authorizationUserDisplay = ref('');
 const selectedReport = ref<'exchange' | 'replenish' | 'dispense' | 'return' | 'spare'>('exchange');
 const isLoginOpen = ref(false);
 const managementModal = ref<AppView | null>(null);
@@ -86,6 +89,13 @@ const stats = computed(() => ({
 }));
 
 const visibleSlots = computed(() => slots.value.slice(0, 12));
+const headerUserName = computed(() => authorizationUserDisplay.value || '管理员');
+const dispenseFaceTitle = computed(() => {
+  if (activeProcess.value.type !== 'dispense') return '身份验证';
+  if (activeProcess.value.phase === 'dispense_authorized_face') return '被授权人身份验证';
+  if (dispenseMode.value === 'authorized') return '授权人身份验证';
+  return '身份验证';
+});
 const isNeedleReturnLikeProcess = computed(() => activeProcess.value.type === 'exchange' || activeProcess.value.type === 'return');
 const isNeedleReturnLikeSlotSelection = computed(() => (
   currentView.value === 'dashboard'
@@ -169,6 +179,12 @@ const resetDispenseSelection = () => {
   dispenseQuantity.value = 1;
 };
 
+const resetDispenseSession = () => {
+  resetDispenseSelection();
+  dispenseMode.value = null;
+  authorizationUserDisplay.value = '';
+};
+
 const formatDateTime = (date: Date) => {
   const pad = (value: number) => value.toString().padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
@@ -239,7 +255,7 @@ const handleAction = (type: string) => {
     return;
   }
   if (type === 'dispense') {
-    resetDispenseSelection();
+    resetDispenseSession();
     activeProcess.value = { type: 'dispense', phase: 'dispense_operation_select' };
     return;
   }
@@ -271,6 +287,11 @@ const handleNextPhase = () => {
     }
     if (phase === 'face_recognition') {
       activeProcess.value = { type, phase: 'dispense_ready' };
+      return;
+    }
+    if (phase === 'dispense_authorized_face') {
+      authorizationUserDisplay.value = '授权人名称 -> 被授权人名称';
+      activeProcess.value = { type, phase: 'quantity_input' };
       return;
     }
   }
@@ -320,6 +341,8 @@ const onViewChange = (view: AppView) => {
   selectedExchangeReason.value = '';
   selectedReturnReason.value = '';
   dispenseQuantity.value = 1;
+  dispenseMode.value = null;
+  authorizationUserDisplay.value = '';
   exchangeCompleted.value = false;
   returnCompleted.value = false;
 };
@@ -328,7 +351,10 @@ const onSlotClick = (slot: NeedleSlot) => {
   if (currentView.value === 'dashboard' && activeProcess.value.type === 'dispense' && activeProcess.value.phase === 'dispense_ready') {
     selectedSlot.value = slot;
     dispenseQuantity.value = slot.count > 0 ? 1 : 0;
-    activeProcess.value = { type: 'dispense', phase: 'quantity_input' };
+    activeProcess.value = {
+      type: 'dispense',
+      phase: dispenseMode.value === 'authorized' ? 'dispense_authorized_face' : 'quantity_input',
+    };
     return;
   }
   if (isNeedleReturnLikeSlotSelection.value) {
@@ -357,6 +383,13 @@ const onProcessReasonSelect = (reason: string) => {
   selectedExchangeReason.value = reason;
 };
 
+const onDispenseOperationSelect = (operation: 'direct' | 'authorized') => {
+  resetDispenseSelection();
+  authorizationUserDisplay.value = '';
+  dispenseMode.value = operation;
+  activeProcess.value = { type: 'dispense', phase: 'face_recognition' };
+};
+
 const onExchangeRecognitionFailed = () => {
   selectedSlot.value = null;
   selectedExchangeReason.value = '';
@@ -374,7 +407,7 @@ const closeProcess = () => {
     return;
   }
   if (currentView.value === 'dashboard' && activeProcess.value.type === 'dispense') {
-    const shouldReturnToDispensePage = ['quantity_input', 'dispensing', 'complete'].includes(activeProcess.value.phase);
+    const shouldReturnToDispensePage = ['dispense_authorized_face', 'quantity_input', 'dispensing', 'complete'].includes(activeProcess.value.phase);
     resetDispenseSelection();
     activeProcess.value = { type: 'dispense', phase: shouldReturnToDispensePage ? 'dispense_ready' : 'idle' };
     return;
@@ -384,6 +417,8 @@ const closeProcess = () => {
   selectedExchangeReason.value = '';
   selectedReturnReason.value = '';
   dispenseQuantity.value = 1;
+  dispenseMode.value = null;
+  authorizationUserDisplay.value = '';
   exchangeCompleted.value = false;
   returnCompleted.value = false;
 };
@@ -408,6 +443,7 @@ const closeManagementModal = () => {
     <Header 
       :current-view="currentView" 
       :active-action="activeProcess.type"
+      :user-name="headerUserName"
       @view-change="onViewChange" 
       @action="handleAction"
       @login="isLoginOpen = true"
@@ -626,6 +662,7 @@ const closeManagementModal = () => {
       :selected-slot="selectedSlot"
       :selected-reason="selectedProcessReason"
       :dispense-quantity="dispenseQuantity"
+      :dispense-face-title="dispenseFaceTitle"
       :slots="slots"
       :is-admin="true"
       @close="closeProcess"
@@ -633,6 +670,7 @@ const closeManagementModal = () => {
       @exchange-select-slot="onNeedleReturnLikeSelectSlot"
       @reason-select="onProcessReasonSelect"
       @dispense-quantity-change="dispenseQuantity = $event"
+      @dispense-operation-select="onDispenseOperationSelect"
       @recognition-failed="onExchangeRecognitionFailed"
       @restart-exchange-from-slot="restartExchangeFromSlot"
     />

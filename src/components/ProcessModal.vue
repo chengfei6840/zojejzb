@@ -12,6 +12,7 @@ interface Props {
   slots?: NeedleSlot[];
   selectedReason?: string;
   dispenseQuantity?: number;
+  dispenseFaceTitle?: string;
   isAdmin?: boolean;
 }
 
@@ -20,6 +21,7 @@ const props = withDefaults(defineProps<Props>(), {
   slots: () => [],
   selectedReason: '',
   dispenseQuantity: 1,
+  dispenseFaceTitle: '身份验证',
   isAdmin: false,
 });
 
@@ -29,6 +31,7 @@ const emit = defineEmits<{
   (e: 'exchangeSelectSlot', slot: NeedleSlot): void;
   (e: 'reasonSelect', reason: string): void;
   (e: 'dispenseQuantityChange', quantity: number): void;
+  (e: 'dispenseOperationSelect', operation: 'direct' | 'authorized'): void;
   (e: 'recognitionFailed'): void;
   (e: 'restartExchangeFromSlot'): void;
 }>();
@@ -64,12 +67,12 @@ const canConfirmDispenseQuantity = computed(() => (
   && props.dispenseQuantity <= maxDispenseQuantity.value
 ));
 const dispenseOperationOptions = [
-  { label: '直接领针', icon: Inbox, primary: true },
-  { label: '授权领针', icon: User },
-  { label: '代领', icon: CreditCard },
-  { label: '代换', icon: Wrench },
-  { label: '批量换针', icon: Upload },
-  { label: '代还', icon: Repeat2 },
+  { label: '直接领针', icon: Inbox, operation: 'direct' as const },
+  { label: '授权领针', icon: User, operation: 'authorized' as const },
+  { label: '代领', icon: CreditCard, operation: null },
+  { label: '代换', icon: Wrench, operation: null },
+  { label: '批量换针', icon: Upload, operation: null },
+  { label: '代还', icon: Repeat2, operation: null },
 ];
 
 const EXCHANGE_SIMPLE_TITLES: Partial<Record<ProcessPhase, string>> = {
@@ -379,7 +382,7 @@ watch(() => props.type, () => {
                   :key="option.label"
                   type="button"
                   class="operation-card"
-                  @click="option.primary && emit('next')"
+                  @click="option.operation && emit('dispenseOperationSelect', option.operation)"
                 >
                   <span class="operation-icon-ring">
                     <component :is="option.icon" :size="54" :stroke-width="2.25" />
@@ -391,7 +394,7 @@ watch(() => props.type, () => {
           </section>
 
           <section
-            v-else-if="type === 'dispense' && phase === 'face_recognition'"
+            v-else-if="type === 'dispense' && (phase === 'face_recognition' || phase === 'dispense_authorized_face')"
             class="login-modal-card"
             role="dialog"
             aria-modal="true"
@@ -401,7 +404,7 @@ watch(() => props.type, () => {
               <div class="login-heading">
                 <div class="login-title-mark" />
                 <div>
-                  <h2 id="dispense-face-title">身份验证</h2>
+                  <h2 id="dispense-face-title">{{ dispenseFaceTitle }}</h2>
                 </div>
               </div>
               <button type="button" class="login-close-button" @click="emit('close')">
