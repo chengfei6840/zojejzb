@@ -1,20 +1,18 @@
 import { NeedleSlot } from './types';
 
-const SEWING_MACHINE_IMAGE = `${import.meta.env.BASE_URL}assets/sewing-machine.png`;
+const SEWING_MACHINE_IMAGE = `${import.meta.env.BASE_URL}assets/sewing-machine-wide.png`;
 
 export const MOCK_SLOTS: NeedleSlot[] = Array.from({ length: 30 }, (_, i) => {
   const num = (i + 1).toString().padStart(2, '0');
-  let count = 14;
+  const screenshotCounts = [28, 16, 3, 0, 23, 24, 2, 0, 18, 17, 7, 0];
+  let count = screenshotCounts[i] ?? 14;
   const maxCount = 20;
-  
-  // 与首页截图保持一致：30 总仓位，26 充足，3 低库存，1 缺货
+
   let status: NeedleSlot['status'] = 'available';
-  if (i === 29) {
+  if (count === 0) {
     status = 'empty';
-    count = 0;
-  } else if (i >= 26 && i <= 28) {
+  } else if (count <= 9) {
     status = 'low';
-    count = 3;
   }
 
   return {
@@ -24,12 +22,12 @@ export const MOCK_SLOTS: NeedleSlot[] = Array.from({ length: 30 }, (_, i) => {
     maxCount,
     status,
     needleType: 'DBx1HS',
-    model: 'A8200L平车',
+    model: 'A8100平车',
     image: SEWING_MACHINE_IMAGE,
     needleNo: '90/14#',
     needleTip: 'R/SET',
-    needleName: 'A8200L平车',
-    usage: 'A8200L平缝',
+    needleName: 'A8100平车',
+    usage: 'A8100平缝',
     brand: '格罗茨'
   };
 });

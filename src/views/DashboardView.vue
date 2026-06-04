@@ -1,9 +1,44 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { LayoutGrid, AlertTriangle, CheckCircle2, BarChart3, User, Search, RotateCw, Settings, Info, LogOut, Inbox } from 'lucide-vue-next';
+import {
+  AlertTriangle,
+  ArchiveRestore,
+  BarChart3,
+  Boxes,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  CircleAlert,
+  CirclePlay,
+  FileCog,
+  Globe2,
+  Home,
+  Info,
+  LayoutGrid,
+  List,
+  LogOut,
+  PackageOpen,
+  Printer,
+  RotateCw,
+  ScanFace,
+  ScanLine,
+  Settings,
+  SlidersHorizontal,
+  User,
+  UserCheck,
+  UserCog,
+  UsersRound,
+} from 'lucide-vue-next';
 import Header from '../components/Header.vue';
 import SlotCard from '../components/SlotCard.vue';
 import ProcessModal from '../components/ProcessModal.vue';
+import LoginModal from '../components/LoginModal.vue';
+import NeedleManagement from '../components/NeedleManagement.vue';
+import NeedlePositionManagement from '../components/NeedlePositionManagement.vue';
+import OrganizationManagement from '../components/OrganizationManagement.vue';
+import RoleManagement from '../components/RoleManagement.vue';
+import UserManagement from '../components/UserManagement.vue';
 import { EXCHANGE_REASONS, MOCK_SLOTS } from '../constants';
 import type { AppView, NeedleSlot, ProcessPhase } from '../types';
 import { cn } from '../lib/utils';
@@ -12,13 +47,53 @@ const currentView = ref<AppView>('dashboard');
 const activeProcess = ref<{type: any, phase: ProcessPhase}>({ type: null, phase: 'idle' });
 const selectedSlot = ref<NeedleSlot | null>(null);
 const selectedReport = ref<'exchange' | 'replenish' | 'dispense' | 'return' | 'spare'>('exchange');
+const isLoginOpen = ref(false);
 
 const stats = computed(() => ({
-  total: MOCK_SLOTS.length,
-  available: MOCK_SLOTS.filter(s => s.status === 'available').length,
-  low: MOCK_SLOTS.filter(s => s.status === 'low').length,
-  empty: MOCK_SLOTS.filter(s => s.status === 'empty').length,
+  total: 30,
+  available: 22,
+  low: 6,
+  empty: 2,
 }));
+
+const visibleSlots = computed(() => MOCK_SLOTS.slice(0, 12));
+
+const managementSections = [
+  {
+    title: '数据维护',
+    items: [
+      { label: '机针管理', icon: LayoutGrid, view: 'needle' as AppView },
+      { label: '针位管理', icon: ArchiveRestore, view: 'needlePosition' as AppView },
+      { label: '组织管理', icon: UsersRound, view: 'organization' as AppView },
+      { label: '角色管理', icon: UserCog, view: 'role' as AppView },
+      { label: '用户管理', icon: UserCheck, view: 'user' as AppView },
+    ],
+  },
+  {
+    title: '设备调试',
+    items: [
+      { label: '部件状态', icon: FileCog, active: true },
+      { label: '人脸识别', icon: ScanFace },
+      { label: '机针识别', icon: ScanLine },
+      { label: '针盒调试', icon: PackageOpen },
+      { label: '控制器调试', icon: SlidersHorizontal },
+      { label: '媒体设置', icon: CirclePlay },
+      { label: '语言设置', icon: Globe2 },
+      { label: '基础参数设置', icon: FileCog },
+      { label: '打印设置', icon: Printer },
+      { label: '登陆设置', icon: User },
+      { label: '异常针碎片丢失处理', icon: AlertTriangle },
+      { label: '换针时间设置', icon: RotateCw },
+    ],
+  },
+  {
+    title: '其他',
+    items: [
+      { label: '关于', icon: Info },
+      { label: '退出系统', icon: LogOut, danger: true },
+    ],
+  },
+];
 
 const EXCHANGE_PHASE_ORDER: ProcessPhase[] = [
   'exchange_put_needle',
@@ -97,6 +172,16 @@ const onExchangeSelectSlot = (slot: NeedleSlot) => {
 const closeProcess = () => {
   activeProcess.value = { type: null, phase: 'idle' };
 };
+
+const closeLogin = () => {
+  isLoginOpen.value = false;
+};
+
+const onSystemItemClick = (item: { view?: AppView }) => {
+  if (item.view) {
+    currentView.value = item.view;
+  }
+};
 </script>
 
 <template>
@@ -105,110 +190,118 @@ const closeProcess = () => {
       :current-view="currentView" 
       @view-change="onViewChange" 
       @action="handleAction"
+      @login="isLoginOpen = true"
     />
 
-    <main class="flex-1 overflow-hidden p-2.5 scrollbar-hide">
+    <main class="flex-1 overflow-hidden scrollbar-hide">
       <!-- Dashboard View -->
-      <div v-if="currentView === 'dashboard'" class="h-full max-w-[1800px] mx-auto flex flex-col gap-2">
+      <div v-if="currentView === 'dashboard'" class="dashboard-shell">
         <!-- Stats Bar -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 flex-shrink-0">
-          <div :class="cn('px-4 py-2 rounded-xl bg-[var(--color-zoje-green)] text-white border border-[var(--color-zoje-green)] industrial-shadow flex items-center justify-between')">
-            <div class="flex items-center gap-2">
-              <div class="p-1.5 rounded-lg bg-white/15 text-white">
-                <LayoutGrid :size="14" />
-              </div>
-              <span class="text-[12px] font-bold tracking-wide">总仓位</span>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <Home :size="43" :stroke-width="2.1" class="stat-icon green" />
+            <div class="stat-copy">
+              <div class="stat-title">总仓位</div>
             </div>
-            <span class="text-xl font-black">{{ stats.total }}</span>
+            <span class="stat-number green">{{ stats.total }}</span>
           </div>
 
-          <div class="px-4 py-2 rounded-xl bg-white border border-gray-100 industrial-shadow flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <div class="p-1.5 rounded-lg bg-gray-50 text-green-600">
-                <CheckCircle2 :size="14" />
-              </div>
-              <span class="text-[12px] font-bold text-gray-600">充足</span>
+          <div class="stat-card">
+            <List :size="43" :stroke-width="2.1" class="stat-icon green" />
+            <div class="stat-copy">
+              <div class="stat-title">充足</div>
+              <div class="stat-subtitle">库存充足（＞10）</div>
             </div>
-            <span class="text-xl font-black text-green-600">{{ stats.available }}</span>
+            <span class="stat-number green">{{ stats.available }}</span>
           </div>
 
-          <div class="px-4 py-2 rounded-xl bg-white border border-gray-100 industrial-shadow flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <div class="p-1.5 rounded-lg bg-gray-50 text-amber-500">
-                <AlertTriangle :size="14" />
-              </div>
-              <span class="text-[12px] font-bold text-gray-600">低库存</span>
+          <div class="stat-card">
+            <CircleAlert :size="48" :stroke-width="2.1" class="stat-icon amber" />
+            <div class="stat-copy">
+              <div class="stat-title">低库存</div>
+              <div class="stat-subtitle">库存不足（1-9）</div>
             </div>
-            <span class="text-xl font-black text-amber-500">{{ stats.low }}</span>
+            <span class="stat-number amber">{{ stats.low }}</span>
           </div>
 
-          <div class="px-4 py-2 rounded-xl bg-white border border-gray-100 industrial-shadow flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <div class="p-1.5 rounded-lg bg-gray-50 text-red-500">
-                <AlertTriangle :size="14" />
-              </div>
-              <span class="text-[12px] font-bold text-gray-600">缺货</span>
+          <div class="stat-card">
+            <CircleAlert :size="48" :stroke-width="2.1" class="stat-icon red" />
+            <div class="stat-copy">
+              <div class="stat-title">缺货</div>
+              <div class="stat-subtitle">库存为0</div>
             </div>
-            <span class="text-xl font-black text-red-500">{{ stats.empty }}</span>
+            <span class="stat-number red">{{ stats.empty }}</span>
           </div>
         </div>
 
         <!-- Grid -->
-        <div class="flex-1 grid grid-cols-6 grid-rows-5 gap-2 min-h-0 pb-0">
+        <div class="slot-grid">
           <SlotCard 
-            v-for="slot in MOCK_SLOTS" 
+            v-for="slot in visibleSlots" 
             :key="slot.id" 
             :slot="slot" 
             @click="onSlotClick" 
           />
         </div>
+
+        <div class="pager">
+          <button class="pager-btn muted"><ChevronsLeft :size="31" :stroke-width="1.7" /></button>
+          <button class="pager-btn muted"><ChevronLeft :size="31" :stroke-width="1.7" /></button>
+          <button class="pager-page active">1</button>
+          <button class="pager-page">2</button>
+          <button class="pager-page">3</button>
+          <button class="pager-btn muted"><ChevronRight :size="31" :stroke-width="1.7" /></button>
+          <button class="pager-btn muted"><ChevronsRight :size="31" :stroke-width="1.7" /></button>
+        </div>
       </div>
 
       <!-- Management View -->
-      <div v-else-if="currentView === 'management'" class="h-full overflow-hidden max-w-[1800px] mx-auto py-2">
-        <div class="grid grid-cols-1 gap-3 h-full">
-          <section v-for="section in [
-            { title: '数据维护', items: [
-              { label: '机针管理', icon: LayoutGrid },
-              { label: '针位管理', icon: Inbox },
-              { label: '组织管理', icon: User },
-              { label: '角色管理', icon: Settings },
-              { label: '用户管理', icon: User }
-            ]},
-            { title: '设备调试', items: [
-              { label: '部件状态', icon: BarChart3 },
-              { label: '人脸识别', icon: User },
-              { label: '机针识别', icon: Search },
-              { label: '针盒调试', icon: RotateCw },
-              { label: '控制器调试', icon: Settings },
-              { label: '媒体设置', icon: Inbox },
-              { label: '语言设置', icon: Settings },
-              { label: '基础参数设置', icon: Settings },
-              { label: '打印设置', icon: Settings },
-              { label: '登录设置', icon: Settings },
-              { label: '异常针碎片丢失处理', icon: AlertTriangle },
-              { label: '换针时间设置', icon: RotateCw }
-            ]},
-            { title: '其他', items: [
-              { label: '关于', icon: Info },
-              { label: '退出系统', icon: LogOut, color: 'text-red-600' }
-            ]}
-          ]" :key="section.title">
-            <div class="flex items-center gap-2 mb-2">
-              <div class="w-1.5 h-6 bg-[var(--color-zoje-green)] rounded-full" />
-              <h2 class="text-xl font-black text-gray-800">{{ section.title }}</h2>
-            </div>
-            <div class="grid grid-cols-5 xl:grid-cols-6 gap-2">
-              <button v-for="item in section.items" :key="item.label" class="flex flex-col items-center justify-center p-3 bg-white border border-gray-100 rounded-xl industrial-shadow hover:border-[var(--color-zoje-green)] hover:-translate-y-0.5 transition-all group min-h-24">
-                <div :class="cn('w-11 h-11 rounded-full bg-gray-50 flex items-center justify-center mb-2 group-hover:bg-green-50 transition-colors shadow-inner', item.color || 'text-[var(--color-zoje-green)]')">
-                  <component :is="item.icon" :size="22" />
-                </div>
-                <span class="text-xs font-black text-gray-700 tracking-tight text-center leading-tight">{{ item.label }}</span>
-              </button>
-            </div>
-          </section>
-        </div>
+      <div v-else-if="currentView === 'management'" class="system-page">
+        <section v-for="section in managementSections" :key="section.title" class="system-section">
+          <div class="system-section-title">
+            <span></span>
+            <h2>{{ section.title }}</h2>
+          </div>
+          <div class="system-card-grid">
+            <button
+              v-for="item in section.items"
+              :key="item.label"
+              @click="onSystemItemClick(item)"
+              :class="cn('system-card', item.active && 'active', item.danger && 'danger')"
+            >
+              <div class="system-icon-ring">
+                <component :is="item.icon" :size="56" :stroke-width="2.4" />
+              </div>
+              <div class="system-card-label">{{ item.label }}</div>
+            </button>
+          </div>
+        </section>
       </div>
+
+      <OrganizationManagement
+        v-else-if="currentView === 'organization'"
+        @back="currentView = 'management'"
+      />
+
+      <NeedleManagement
+        v-else-if="currentView === 'needle'"
+        @back="currentView = 'management'"
+      />
+
+      <NeedlePositionManagement
+        v-else-if="currentView === 'needlePosition'"
+        @back="currentView = 'management'"
+      />
+
+      <RoleManagement
+        v-else-if="currentView === 'role'"
+        @back="currentView = 'management'"
+      />
+
+      <UserManagement
+        v-else-if="currentView === 'user'"
+        @back="currentView = 'management'"
+      />
 
       <!-- Reporting View -->
       <div v-else-if="currentView === 'reporting'" class="h-full overflow-y-auto max-w-[1800px] mx-auto py-2 pb-1 pr-2">
@@ -311,6 +404,12 @@ const closeProcess = () => {
       @close="closeProcess"
       @next="handleNextPhase"
       @exchange-select-slot="onExchangeSelectSlot"
+    />
+
+    <LoginModal
+      :open="isLoginOpen"
+      @close="closeLogin"
+      @login="closeLogin"
     />
   </div>
 </template>
