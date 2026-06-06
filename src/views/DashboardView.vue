@@ -41,7 +41,9 @@ import OrganizationManagement from '../components/OrganizationManagement.vue';
 import RoleManagement from '../components/RoleManagement.vue';
 import UserManagement from '../components/UserManagement.vue';
 import { EXCHANGE_REASONS, MOCK_SLOTS, RETURN_REASONS } from '../constants';
+import { messages, normalizeSupportedLocale } from '../i18n';
 import type { AppView, NeedleSlot, ProcessPhase } from '../types';
+import type { LanguageCode } from '../i18n';
 import { cn } from '../lib/utils';
 
 interface ExchangeReportRow {
@@ -56,6 +58,7 @@ interface ExchangeReportRow {
 }
 
 const currentView = ref<AppView>('dashboard');
+const language = ref<LanguageCode>('zh-CN');
 type ProcessType = 'exchange' | 'return' | 'dispense' | null;
 type DispenseMode = 'direct' | 'authorized' | 'proxy' | 'proxyExchange' | 'batchExchange' | 'proxyReturn' | null;
 
@@ -83,6 +86,8 @@ const returnReports = ref<ExchangeReportRow[]>([
   { id: 'return-1', time: '2026-04-24 10:45:10', user: '管理员', slotNumber: '03', needleModel: 'DBx1HS 90/14#', quantity: 1, reason: '订单结束', status: 'COMPLETED' },
   { id: 'return-2', time: '2026-04-24 10:40:28', user: '管理员', slotNumber: '07', needleModel: 'DBx1HS 90/14#', quantity: 1, reason: '领用冗余', status: 'COMPLETED' },
 ]);
+const locale = computed(() => normalizeSupportedLocale(language.value));
+const t = computed(() => messages[locale.value]);
 
 const stats = computed(() => ({
   total: slots.value.length,
@@ -125,42 +130,50 @@ const resetNeedleReturnLikeSelection = (type: 'exchange' | 'return' = 'exchange'
   activeProcess.value = { type, phase: 'exchange_select_slot' };
 };
 
-const managementSections = [
+const managementSections = computed(() => [
   {
-    title: '数据维护',
+    title: t.value.management.dataMaintenance,
     items: [
-      { label: '机针管理', icon: LayoutGrid, view: 'needle' as AppView },
-      { label: '针位管理', icon: ArchiveRestore, view: 'needlePosition' as AppView },
-      { label: '组织管理', icon: UsersRound, view: 'organization' as AppView },
-      { label: '角色管理', icon: UserCog, view: 'role' as AppView },
-      { label: '用户管理', icon: UserCheck, view: 'user' as AppView },
+      { label: t.value.management.needleManagement, icon: LayoutGrid, view: 'needle' as AppView },
+      { label: t.value.management.needlePositionManagement, icon: ArchiveRestore, view: 'needlePosition' as AppView },
+      { label: t.value.management.organizationManagement, icon: UsersRound, view: 'organization' as AppView },
+      { label: t.value.management.roleManagement, icon: UserCog, view: 'role' as AppView },
+      { label: t.value.management.userManagement, icon: UserCheck, view: 'user' as AppView },
     ],
   },
   {
-    title: '设备调试',
+    title: t.value.management.deviceDebugging,
     items: [
-      { label: '部件状态', icon: FileCog, active: true },
-      { label: '人脸识别', icon: ScanFace },
-      { label: '机针识别', icon: ScanLine },
-      { label: '针盒调试', icon: PackageOpen },
-      { label: '控制器调试', icon: SlidersHorizontal },
-      { label: '媒体设置', icon: CirclePlay },
-      { label: '语言设置', icon: Globe2 },
-      { label: '基础参数设置', icon: FileCog },
-      { label: '打印设置', icon: Printer },
-      { label: '登陆设置', icon: User },
-      { label: '异常针碎片丢失处理', icon: AlertTriangle },
-      { label: '换针时间设置', icon: RotateCw },
+      { label: t.value.management.componentStatus, icon: FileCog, active: true },
+      { label: t.value.management.faceRecognition, icon: ScanFace },
+      { label: t.value.management.needleRecognition, icon: ScanLine },
+      { label: t.value.management.needleBoxDebugging, icon: PackageOpen },
+      { label: t.value.management.controllerDebugging, icon: SlidersHorizontal },
+      { label: t.value.management.mediaSettings, icon: CirclePlay },
+      { label: t.value.management.languageSettings, icon: Globe2 },
+      { label: t.value.management.basicParameterSettings, icon: FileCog },
+      { label: t.value.management.printSettings, icon: Printer },
+      { label: t.value.management.loginSettings, icon: User },
+      { label: t.value.management.fragmentLossHandling, icon: AlertTriangle },
+      { label: t.value.management.exchangeTimeSettings, icon: RotateCw },
     ],
   },
   {
-    title: '其他',
+    title: t.value.management.other,
     items: [
-      { label: '关于', icon: Info },
-      { label: '退出系统', icon: LogOut, danger: true },
+      { label: t.value.management.about, icon: Info },
+      { label: t.value.management.exitSystem, icon: LogOut, danger: true },
     ],
   },
-];
+]);
+
+const reportTabs = computed(() => [
+  { id: 'exchange', label: t.value.reporting.exchangeReport },
+  { id: 'replenish', label: t.value.reporting.replenishReport },
+  { id: 'dispense', label: t.value.reporting.dispenseReport },
+  { id: 'return', label: t.value.reporting.returnReport },
+  { id: 'spare', label: t.value.reporting.spareReport },
+]);
 
 const EXCHANGE_PHASE_ORDER: ProcessPhase[] = [
   'exchange_select_slot',
@@ -648,8 +661,10 @@ const closeManagementModal = () => {
     <Header 
       :current-view="currentView" 
       :active-action="activeProcess.type"
+      :language="language"
       @view-change="onViewChange" 
       @action="handleAction"
+      @language-change="language = $event"
     />
 
     <main class="flex-1 overflow-hidden scrollbar-hide">
@@ -660,7 +675,7 @@ const closeManagementModal = () => {
           <div class="stat-card">
             <Home :size="43" :stroke-width="2.1" class="stat-icon green" />
             <div class="stat-copy">
-              <div class="stat-title">总仓位</div>
+              <div class="stat-title">{{ t.dashboard.totalSlots }}</div>
             </div>
             <span class="stat-number green">{{ stats.total }}</span>
           </div>
@@ -668,8 +683,8 @@ const closeManagementModal = () => {
           <div class="stat-card">
             <List :size="43" :stroke-width="2.1" class="stat-icon green" />
             <div class="stat-copy">
-              <div class="stat-title">充足</div>
-              <div class="stat-subtitle">库存充足（＞10）</div>
+              <div class="stat-title">{{ t.dashboard.available }}</div>
+              <div class="stat-subtitle">{{ t.dashboard.availableSubtitle }}</div>
             </div>
             <span class="stat-number green">{{ stats.available }}</span>
           </div>
@@ -677,8 +692,8 @@ const closeManagementModal = () => {
           <div class="stat-card">
             <CircleAlert :size="48" :stroke-width="2.1" class="stat-icon amber" />
             <div class="stat-copy">
-              <div class="stat-title">低库存</div>
-              <div class="stat-subtitle">库存不足（1-9）</div>
+              <div class="stat-title">{{ t.dashboard.lowStock }}</div>
+              <div class="stat-subtitle">{{ t.dashboard.lowStockSubtitle }}</div>
             </div>
             <span class="stat-number amber">{{ stats.low }}</span>
           </div>
@@ -686,8 +701,8 @@ const closeManagementModal = () => {
           <div class="stat-card">
             <CircleAlert :size="48" :stroke-width="2.1" class="stat-icon red" />
             <div class="stat-copy">
-              <div class="stat-title">缺货</div>
-              <div class="stat-subtitle">库存为0</div>
+              <div class="stat-title">{{ t.dashboard.outOfStock }}</div>
+              <div class="stat-subtitle">{{ t.dashboard.outOfStockSubtitle }}</div>
             </div>
             <span class="stat-number red">{{ stats.empty }}</span>
           </div>
@@ -743,13 +758,7 @@ const closeManagementModal = () => {
         <div class="flex items-center justify-between gap-2 mb-2 bg-white p-1 rounded-lg shadow-sm border border-gray-100">
           <div class="flex items-center gap-2">
             <button 
-              v-for="tab in [
-                { id: 'exchange', label: '换针报表' },
-                { id: 'replenish', label: '补针报表' },
-                { id: 'dispense', label: '领针报表' },
-                { id: 'return', label: '还针报表' },
-                { id: 'spare', label: '备用仓报表' }
-              ]"
+              v-for="tab in reportTabs"
               :key="tab.id"
               @click="selectedReport = tab.id as any"
               :class="cn(
@@ -764,12 +773,12 @@ const closeManagementModal = () => {
           </div>
           <div class="flex items-center gap-2">
             <select class="bg-white border-2 border-gray-100 rounded-md px-2.5 py-1 text-xs font-bold text-gray-600 outline-none focus:border-[var(--color-zoje-green)] transition-all">
-              <option>全部记录</option>
-              <option>本周记录</option>
-              <option>本月记录</option>
+              <option>{{ t.reporting.allRecords }}</option>
+              <option>{{ t.reporting.weekRecords }}</option>
+              <option>{{ t.reporting.monthRecords }}</option>
             </select>
             <button class="bg-[var(--color-zoje-green)] text-white px-4 py-1 rounded-md text-xs font-bold hover:brightness-110 active:scale-95 transition-all shadow-md">
-              导出 Excel
+              {{ t.reporting.exportExcel }}
             </button>
           </div>
         </div>
@@ -779,21 +788,21 @@ const closeManagementModal = () => {
             <table class="w-full text-left border-collapse">
               <thead>
                 <tr class="bg-gray-50/50 text-[10px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
-                  <th class="px-6 py-3">时间</th>
-                  <th class="px-6 py-3">操作人</th>
-                  <th class="px-6 py-3">针位/属性</th>
+                  <th class="px-6 py-3">{{ t.reporting.time }}</th>
+                  <th class="px-6 py-3">{{ t.reporting.operator }}</th>
+                  <th class="px-6 py-3">{{ t.reporting.slotOrAttribute }}</th>
                   <th class="px-6 py-3">
-                    {{ selectedReport === 'exchange' ? '机针型号' : '针对内容' }}
+                    {{ selectedReport === 'exchange' ? t.reporting.needleModel : t.reporting.targetContent }}
                   </th>
                   <th class="px-6 py-3">
                     {{ 
-                      selectedReport === 'replenish' ? '补针数量' : 
-                      selectedReport === 'dispense' ? '领针数量' :
-                      selectedReport === 'return' ? '回收数量' : '数量' 
+                      selectedReport === 'replenish' ? t.reporting.replenishQuantity : 
+                      selectedReport === 'dispense' ? t.reporting.dispenseQuantity :
+                      selectedReport === 'return' ? t.reporting.returnQuantity : t.reporting.quantity 
                     }}
                   </th>
-                  <th class="px-6 py-3">原因/来源</th>
-                  <th class="px-6 py-3 text-right">状态</th>
+                  <th class="px-6 py-3">{{ t.reporting.reasonOrSource }}</th>
+                  <th class="px-6 py-3 text-right">{{ t.reporting.status }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -806,10 +815,10 @@ const closeManagementModal = () => {
                     {{ typeof i === 'number' ? `2026-04-24 10:30:${i}2` : i.time }}
                   </td>
                   <td class="px-6 py-3 text-sm font-bold text-gray-800">
-                    {{ typeof i === 'number' ? '管理员' : i.user }}
+                    {{ typeof i === 'number' ? t.reporting.admin : i.user }}
                   </td>
                   <td class="px-6 py-3 text-sm font-mono text-[var(--color-zoje-green)] font-black">
-                    {{ typeof i === 'number' ? (selectedReport === 'spare' ? '备用仓' : `#${i.toString().padStart(2, '0')}`) : `#${i.slotNumber}` }}
+                    {{ typeof i === 'number' ? (selectedReport === 'spare' ? t.reporting.spareWarehouse : `#${i.toString().padStart(2, '0')}`) : `#${i.slotNumber}` }}
                   </td>
                   <td class="px-6 py-3 text-sm font-bold text-gray-700">
                     {{ typeof i === 'number' ? 'DB×1HS 90/14#' : i.needleModel }}
@@ -821,20 +830,20 @@ const closeManagementModal = () => {
                     {{ 
                       typeof i !== 'number' ? i.reason :
                       selectedReport === 'exchange' ? EXCHANGE_REASONS[i % EXCHANGE_REASONS.length] : 
-                      selectedReport === 'replenish' ? '外购进库' :
-                      selectedReport === 'dispense' ? '生产领用' :
-                      selectedReport === 'return' ? RETURN_REASONS[i % RETURN_REASONS.length] : '出库'
+                      selectedReport === 'replenish' ? t.reporting.purchaseStockIn :
+                      selectedReport === 'dispense' ? t.reporting.productionUse :
+                      selectedReport === 'return' ? RETURN_REASONS[i % RETURN_REASONS.length] : t.reporting.outbound
                     }}
                   </td>
                   <td class="px-6 py-3 text-right">
-                    <span class="text-[10px] font-bold px-3 py-1.5 bg-green-50 text-green-600 rounded-lg border border-green-100">COMPLETED</span>
+                    <span class="text-[10px] font-bold px-3 py-1.5 bg-green-50 text-green-600 rounded-lg border border-green-100">{{ t.reporting.completed }}</span>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
           <div class="p-2.5 border-t border-gray-100 bg-gray-50/30 flex items-center justify-between">
-            <span class="text-xs text-gray-400 font-bold uppercase tracking-wider">Show 10 of 24 records</span>
+            <span class="text-xs text-gray-400 font-bold uppercase tracking-wider">{{ t.reporting.showRecords }}</span>
             <div class="flex items-center gap-2">
               <button class="w-8 h-8 rounded-lg border-2 border-gray-100 flex items-center justify-center text-gray-400 font-bold hover:bg-white hover:border-[var(--color-zoje-green)] hover:text-[var(--color-zoje-green)] transition-all">1</button>
               <button class="w-8 h-8 rounded-lg border-2 border-gray-100 flex items-center justify-center text-gray-400 font-bold hover:bg-white hover:border-[var(--color-zoje-green)] hover:text-[var(--color-zoje-green)] transition-all">2</button>
@@ -889,6 +898,7 @@ const closeManagementModal = () => {
     <LoginModal
       :open="isLoginOpen"
       initial-mode="face"
+      :language="language"
       @close="closeLogin"
       @login="completeProtectedViewLogin"
     />

@@ -1,16 +1,20 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { CreditCard, ScanFace, User, LockKeyhole, Camera, X, CircleX } from 'lucide-vue-next';
+import { messages, normalizeSupportedLocale } from '../i18n';
+import type { LanguageCode } from '../i18n';
 
 interface Props {
   open: boolean;
   initialMode?: LoginMode;
+  language?: LanguageCode;
 }
 
 type LoginMode = 'account' | 'face' | 'card';
 
 const props = withDefaults(defineProps<Props>(), {
   initialMode: 'account',
+  language: 'zh-CN',
 });
 
 const emit = defineEmits<{
@@ -25,11 +29,13 @@ const accountPassword = ref('123456');
 const faceProcessing = ref(false);
 let faceTimer: ReturnType<typeof setTimeout> | null = null;
 
-const loginMethodLabels: Record<LoginMode, string> = {
-  account: '账号密码验证',
-  face: '刷脸验证',
-  card: '刷卡验证',
-};
+const locale = computed(() => normalizeSupportedLocale(props.language));
+const t = computed(() => messages[locale.value].login);
+const loginMethodLabels = computed<Record<LoginMode, string>>(() => ({
+  account: t.value.accountMethod,
+  face: t.value.faceMethod,
+  card: t.value.cardMethod,
+}));
 
 const showLoginFailure = (method: LoginMode) => {
   loginResult.value = { method };
@@ -50,7 +56,7 @@ const switchLoginMode = (mode: LoginMode) => {
 };
 
 const handleAccountLogin = () => {
-  if (accountName.value.trim() === '管理员' && accountPassword.value === '123456') {
+  if (['管理员', 'Admin'].includes(accountName.value.trim()) && accountPassword.value === '123456') {
     emit('login');
     return;
   }
@@ -75,7 +81,7 @@ watch(
   (open) => {
     if (open) {
       loginMode.value = props.initialMode;
-      accountName.value = '管理员';
+      accountName.value = t.value.accountName;
       accountPassword.value = '123456';
       faceProcessing.value = false;
       if (faceTimer) {
@@ -115,7 +121,7 @@ watch(
               <div class="login-heading">
                 <div class="login-title-mark" />
                 <div>
-                  <h2 id="login-title">身份验证</h2>
+                  <h2 id="login-title">{{ t.title }}</h2>
                 </div>
               </div>
               <button v-if="loginMode !== 'account'" type="button" class="login-close-button" @click="emit('close')">
@@ -129,52 +135,52 @@ watch(
                   <CircleX :size="82" :stroke-width="1.9" />
                 </div>
                 <div class="login-result-title">
-                  {{ loginMethodLabels[loginResult.method] }}失败
+                  {{ loginMethodLabels[loginResult.method] }}{{ t.failureSuffix }}
                 </div>
                 <div class="login-result-message">
-                  身份验证未通过，请重新验证或切换其他验证方式
+                  {{ t.failureMessage }}
                 </div>
                 <div class="login-result-actions">
-                  <button type="button" class="login-result-secondary" @click="resetLoginResult">重新验证</button>
+                  <button type="button" class="login-result-secondary" @click="resetLoginResult">{{ t.retry }}</button>
                 </div>
               </div>
 
               <div v-else-if="loginMode === 'account'">
                 <label class="login-field">
-                  <span>账号 <strong>*</strong></span>
+                  <span>{{ t.accountLabel }} <strong>*</strong></span>
                   <div class="login-input-box">
                     <User :size="24" :stroke-width="2.3" />
-                    <input v-model="accountName" type="text" aria-label="账号" />
+                    <input v-model="accountName" type="text" :aria-label="t.accountLabel" />
                   </div>
                 </label>
 
                 <label class="login-field">
-                  <span>密码 <strong>*</strong></span>
+                  <span>{{ t.passwordLabel }} <strong>*</strong></span>
                   <div class="login-input-box">
                     <LockKeyhole :size="24" :stroke-width="2.3" />
-                    <input v-model="accountPassword" type="password" aria-label="密码" />
+                    <input v-model="accountPassword" type="password" :aria-label="t.passwordLabel" />
                   </div>
                 </label>
 
-                <button type="button" class="login-confirm" @click="handleAccountLogin">确认</button>
+                <button type="button" class="login-confirm" @click="handleAccountLogin">{{ t.confirm }}</button>
                 <button type="button" class="login-failure-link" @click="showLoginFailure('account')">
-                  模拟账号验证失败
+                  {{ t.accountFailureAction }}
                 </button>
 
                 <div class="login-alt-divider">
                   <span></span>
-                  <strong>其他验证方式</strong>
+                  <strong>{{ t.otherMethods }}</strong>
                   <span></span>
                 </div>
 
                 <div class="login-alt-row">
                   <button type="button" class="login-alt-link" @click="switchLoginMode('card')">
                     <CreditCard :size="32" :stroke-width="2.2" />
-                    <span>刷卡验证</span>
+                    <span>{{ t.cardMethod }}</span>
                   </button>
                   <button type="button" class="login-alt-link" @click="switchLoginMode('face')">
                     <ScanFace :size="32" :stroke-width="2.2" />
-                    <span>刷脸验证</span>
+                    <span>{{ t.faceMethod }}</span>
                   </button>
                 </div>
               </div>
@@ -190,30 +196,30 @@ watch(
                     <span v-if="faceProcessing" class="face-scan-line"></span>
                   </div>
                   <div v-if="faceProcessing" class="face-processing-stack">
-                    <div class="face-processing-title">正在识别人脸</div>
+                    <div class="face-processing-title">{{ t.faceProcessingTitle }}</div>
                     <div class="face-processing-steps">
-                      <span>采集图像</span>
-                      <span>活体检测</span>
-                      <span>身份比对</span>
+                      <span>{{ t.faceStepCapture }}</span>
+                      <span>{{ t.faceStepLiveness }}</span>
+                      <span>{{ t.faceStepCompare }}</span>
                     </div>
                   </div>
-                  <div v-else class="face-camera-text">请对准摄像头进行人脸识别</div>
+                  <div v-else class="face-camera-text">{{ t.facePrompt }}</div>
                 </div>
 
                 <div class="login-alt-divider face-alt-divider">
                   <span></span>
-                  <strong>其他验证方式</strong>
+                  <strong>{{ t.otherMethods }}</strong>
                   <span></span>
                 </div>
 
                 <div class="login-alt-row">
                   <button type="button" class="login-alt-link" @click="switchLoginMode('account')">
                     <User :size="32" :stroke-width="2.2" />
-                    <span>账号密码验证</span>
+                    <span>{{ t.accountMethod }}</span>
                   </button>
                   <button type="button" class="login-alt-link" @click="switchLoginMode('card')">
                     <CreditCard :size="32" :stroke-width="2.2" />
-                    <span>刷卡验证</span>
+                    <span>{{ t.cardMethod }}</span>
                   </button>
                 </div>
               </div>
@@ -223,24 +229,24 @@ watch(
                   <div class="card-reader-icon">
                     <CreditCard :size="32" :stroke-width="2.2" />
                   </div>
-                  <div class="card-reader-title">请将工牌靠近读卡区</div>
-                  <div class="card-reader-subtitle">系统将自动识别卡号并完成身份验证</div>
+                  <div class="card-reader-title">{{ t.cardTitle }}</div>
+                  <div class="card-reader-subtitle">{{ t.cardSubtitle }}</div>
                 </div>
 
                 <div class="login-alt-divider face-alt-divider">
                   <span></span>
-                  <strong>其他验证方式</strong>
+                  <strong>{{ t.otherMethods }}</strong>
                   <span></span>
                 </div>
 
                 <div class="login-alt-row">
                   <button type="button" class="login-alt-link" @click="switchLoginMode('account')">
                     <User :size="32" :stroke-width="2.2" />
-                    <span>账号密码验证</span>
+                    <span>{{ t.accountMethod }}</span>
                   </button>
                   <button type="button" class="login-alt-link" @click="switchLoginMode('face')">
                     <ScanFace :size="32" :stroke-width="2.2" />
-                    <span>刷脸验证</span>
+                    <span>{{ t.faceMethod }}</span>
                   </button>
                 </div>
               </div>
