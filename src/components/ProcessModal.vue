@@ -15,7 +15,7 @@ interface ProxyUserOption {
 
 interface Props {
   phase: ProcessPhase;
-  type: 'exchange' | 'return' | 'dispense' | 'replenish' | 'clear' | null;
+  type: 'exchange' | 'return' | 'dispense' | null;
   selectedSlot?: NeedleSlot | null;
   slots?: NeedleSlot[];
   selectedReason?: string;
@@ -190,7 +190,6 @@ const getTitle = () => {
     case 'exchange': return '换针流程';
     case 'return': return '还针流程';
     case 'dispense': return '领用机针流程';
-    case 'replenish': return '库存补充';
     default: return '操作处理';
   }
 };

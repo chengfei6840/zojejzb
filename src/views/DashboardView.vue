@@ -56,7 +56,7 @@ interface ExchangeReportRow {
 }
 
 const currentView = ref<AppView>('dashboard');
-type ProcessType = 'exchange' | 'return' | 'dispense' | 'replenish' | 'clear' | null;
+type ProcessType = 'exchange' | 'return' | 'dispense' | null;
 type DispenseMode = 'direct' | 'authorized' | 'proxy' | 'proxyExchange' | 'proxyReturn' | null;
 
 const activeProcess = ref<{type: ProcessType, phase: ProcessPhase}>({ type: 'exchange', phase: 'exchange_select_slot' });
@@ -262,6 +262,11 @@ const completeDispense = () => {
 };
 
 const handleAction = (type: string) => {
+  if (type === 'replenish' || type === 'clear') {
+    activeProcess.value = { type: null, phase: 'idle' };
+    selectedSlot.value = null;
+    return;
+  }
   if (type === 'exchange' || type === 'return') {
     resetNeedleReturnLikeSelection(type);
     return;
@@ -355,12 +360,6 @@ const handleNextPhase = () => {
     if (phase === 'dispensing') {
       completeDispense();
     }
-  }
-
-  if (type === 'replenish') {
-     if (phase === 'face_recognition') {
-       nextIdx = phases.indexOf('quantity_input');
-     }
   }
 
   if (nextIdx < phases.length) {
