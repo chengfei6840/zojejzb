@@ -19,10 +19,13 @@ interface Props {
   selectedSlot?: NeedleSlot | null;
   slots?: NeedleSlot[];
   selectedReason?: string;
+  recognitionFailureTitle?: string;
+  recognitionFailureMessage?: string;
   dispenseQuantity?: number;
   dispenseFaceTitle?: string;
   proxyUserSelectTitle?: string;
   isProxyExchange?: boolean;
+  isBatchExchange?: boolean;
   isProxyReturn?: boolean;
   isAdmin?: boolean;
 }
@@ -31,10 +34,13 @@ const props = withDefaults(defineProps<Props>(), {
   selectedSlot: null,
   slots: () => [],
   selectedReason: '',
+  recognitionFailureTitle: '机针识别失败',
+  recognitionFailureMessage: '和所选针位的机针不匹配。',
   dispenseQuantity: 1,
   dispenseFaceTitle: '身份验证',
   proxyUserSelectTitle: '选择代领用户',
   isProxyExchange: false,
+  isBatchExchange: false,
   isProxyReturn: false,
   isAdmin: false,
 });
@@ -45,8 +51,9 @@ const emit = defineEmits<{
   (e: 'exchangeSelectSlot', slot: NeedleSlot): void;
   (e: 'reasonSelect', reason: string): void;
   (e: 'dispenseQuantityChange', quantity: number): void;
-  (e: 'dispenseOperationSelect', operation: 'direct' | 'authorized' | 'proxy' | 'proxyExchange' | 'proxyReturn'): void;
+  (e: 'dispenseOperationSelect', operation: 'direct' | 'authorized' | 'proxy' | 'proxyExchange' | 'batchExchange' | 'proxyReturn'): void;
   (e: 'proxyUserConfirm', user: ProxyUserOption): void;
+  (e: 'batchExchangeContinue', shouldContinue: boolean): void;
   (e: 'recognitionFailed'): void;
   (e: 'restartExchangeFromSlot'): void;
 }>();
@@ -67,6 +74,8 @@ const PROXY_NEEDLE_STYLE_PHASES: ProcessPhase[] = [
   'recognition_failed',
   'wrapping',
   'dispensing',
+  'batch_exchange_continue',
+  'batch_exchange_place_needle',
   'complete',
 ];
 const isNeedleReturnLikeProcess = computed(() => props.type === 'exchange' || props.type === 'return');
@@ -75,12 +84,22 @@ const isProxyExchangeProcess = computed(() => (
   && props.isProxyExchange
   && PROXY_NEEDLE_STYLE_PHASES.includes(props.phase)
 ));
+const isBatchExchangeProcess = computed(() => (
+  props.type === 'dispense'
+  && props.isBatchExchange
+  && PROXY_NEEDLE_STYLE_PHASES.includes(props.phase)
+));
 const isProxyReturnProcess = computed(() => (
   props.type === 'dispense'
   && props.isProxyReturn
   && PROXY_NEEDLE_STYLE_PHASES.includes(props.phase)
 ));
-const isExchangeStyledProcess = computed(() => isNeedleReturnLikeProcess.value || isProxyExchangeProcess.value || isProxyReturnProcess.value);
+const isExchangeStyledProcess = computed(() => (
+  isNeedleReturnLikeProcess.value
+  || isProxyExchangeProcess.value
+  || isBatchExchangeProcess.value
+  || isProxyReturnProcess.value
+));
 const isReturnProcess = computed(() => props.type === 'return' || isProxyReturnProcess.value);
 const processActionLabel = computed(() => isReturnProcess.value ? '还针' : '换针');
 const reasonOptions = computed(() => isReturnProcess.value ? returnReasonOptions.value : exchangeReasonOptions.value);
@@ -108,7 +127,7 @@ const dispenseOperationOptions = [
   { label: '授权领针', icon: User, operation: 'authorized' as const },
   { label: '代领', icon: CreditCard, operation: 'proxy' as const },
   { label: '代换', icon: Wrench, operation: 'proxyExchange' as const },
-  { label: '批量换针', icon: Upload, operation: null },
+  { label: '批量换针', icon: Upload, operation: 'batchExchange' as const },
   { label: '代还', icon: Repeat2, operation: 'proxyReturn' as const },
 ];
 
@@ -135,6 +154,8 @@ const EXCHANGE_SIMPLE_TITLES: Partial<Record<ProcessPhase, string>> = {
   vision_processing: '机针识别',
   wrapping: '正在包针',
   dispensing: '正在出针',
+  batch_exchange_continue: '是否继续换针',
+  batch_exchange_place_needle: '放入机针',
   complete: '出针完成',
 };
 
@@ -152,6 +173,8 @@ const EXCHANGE_STEP_LABELS: Partial<Record<ProcessPhase, string>> = {
   recognition_failed: '第六步：未识别到机针',
   wrapping: '第六步：正在包针',
   dispensing: '第六步：正在出针',
+  batch_exchange_continue: '第七步：是否继续换针',
+  batch_exchange_place_needle: '第八步：放入机针',
   complete: '第七步：取针口取针',
 };
 
@@ -175,6 +198,8 @@ const exchangeDisplayStep = computed(() => {
     recognition_failed: 6,
     wrapping: 6,
     dispensing: 6,
+    batch_exchange_continue: 7,
+    batch_exchange_place_needle: 8,
     complete: 7,
   };
   return map[props.phase] ?? null;
@@ -184,6 +209,8 @@ const getTitle = () => {
   if (props.type === 'dispense' && props.phase === 'quantity_input') return '领针数量';
   if (props.type === 'dispense' && props.phase === 'dispensing') return '正在出针';
   if (props.type === 'dispense' && props.phase === 'complete') return isProxyReturnProcess.value ? '还针完成' : '出针完成';
+  if (props.type === 'dispense' && props.phase === 'batch_exchange_continue') return '是否继续换针';
+  if (props.type === 'dispense' && props.phase === 'batch_exchange_place_needle') return '放入机针';
   if (props.type === 'dispense' && props.phase === 'select_reason') return isProxyReturnProcess.value ? '还针原因' : '换针原因';
   if (props.type === 'dispense' && props.phase === 'dispense_proxy_user_select') return props.proxyUserSelectTitle;
   switch (props.type) {
@@ -196,6 +223,9 @@ const getTitle = () => {
 
 const getStepDescription = () => {
   if (isProxyExchangeProcess.value && EXCHANGE_STEP_LABELS[props.phase]) {
+    return EXCHANGE_STEP_LABELS[props.phase]!;
+  }
+  if (isBatchExchangeProcess.value && EXCHANGE_STEP_LABELS[props.phase]) {
     return EXCHANGE_STEP_LABELS[props.phase]!;
   }
   if (isProxyReturnProcess.value && RETURN_STEP_LABELS[props.phase]) {
@@ -908,9 +938,9 @@ watch(() => props.phase, (newPhase) => {
                   <AlertTriangle :size="42" />
                 </div>
                 <div class="text-center">
-                  <h3 class="text-2xl font-black text-gray-800">未识别到机针</h3>
-                  <p v-if="!isExchangeStyledProcess" class="text-gray-500 mt-2 leading-relaxed">
-                    请将机针放入回收口，放入机针后再重新从第三步（选择针位）开始操作。
+                  <h3 class="text-2xl font-black text-gray-800">{{ recognitionFailureTitle }}</h3>
+                  <p v-if="recognitionFailureMessage" class="text-gray-500 mt-2 leading-relaxed">
+                    {{ recognitionFailureMessage }}
                   </p>
                 </div>
                 <button @click="emit('restartExchangeFromSlot')" class="w-full py-4 rounded-xl bg-[var(--color-zoje-green)] text-white font-bold hover:brightness-110 active:scale-95 transition-all shadow-lg">
@@ -952,6 +982,51 @@ watch(() => props.phase, (newPhase) => {
                 </div>
               </div>
 
+              <!-- Batch Exchange Continue -->
+              <div v-else-if="phase === 'batch_exchange_continue'" class="flex flex-col items-center gap-7 py-8">
+                <div class="w-20 h-20 bg-green-50 text-[var(--color-zoje-green)] rounded-full flex items-center justify-center">
+                  <CheckCircle2 :size="42" />
+                </div>
+                <div class="text-center">
+                  <h3 class="text-2xl font-black text-gray-800">是否继续换针</h3>
+                  <p class="mt-2 text-base font-bold text-gray-500">当前机针已完成包针并已出新针。</p>
+                </div>
+                <div class="grid grid-cols-2 gap-4 w-full">
+                  <button
+                    type="button"
+                    @click="emit('batchExchangeContinue', false)"
+                    class="py-4 rounded-xl bg-gray-100 text-gray-600 font-black hover:bg-gray-200 active:scale-[0.98] transition-all"
+                  >
+                    不继续
+                  </button>
+                  <button
+                    type="button"
+                    @click="emit('batchExchangeContinue', true)"
+                    class="py-4 rounded-xl bg-[var(--color-zoje-green)] text-white font-black shadow-lg hover:brightness-105 active:scale-[0.98] transition-all"
+                  >
+                    继续换针
+                  </button>
+                </div>
+              </div>
+
+              <!-- Batch Exchange Place Needle -->
+              <div v-else-if="phase === 'batch_exchange_place_needle'" class="flex flex-col items-center gap-7 py-8">
+                <div class="w-20 h-20 bg-green-50 text-[var(--color-zoje-green)] rounded-full flex items-center justify-center">
+                  <Upload :size="42" />
+                </div>
+                <div class="text-center">
+                  <h3 class="text-2xl font-black text-gray-800">请把机针放到换针口</h3>
+                  <p class="mt-2 text-base font-bold text-gray-500">放入后点击确认，系统将重新识别机针。</p>
+                </div>
+                <button
+                  type="button"
+                  @click="emit('next')"
+                  class="w-full py-4 rounded-xl bg-[var(--color-zoje-green)] text-white font-black shadow-lg hover:brightness-105 active:scale-[0.98] transition-all"
+                >
+                  确认
+                </button>
+              </div>
+
               <!-- Complete -->
               <div v-else-if="phase === 'complete'" class="flex flex-col items-center gap-6 py-8">
                 <div class="w-20 h-20 bg-green-500 text-white rounded-full flex items-center justify-center shadow-lg">
@@ -966,7 +1041,7 @@ watch(() => props.phase, (newPhase) => {
                   </p>
                 </div>
                 <button
-                  @click="isExchangeStyledProcess && !isProxyExchangeProcess && !isProxyReturnProcess ? emit('restartExchangeFromSlot') : emit('close')"
+                  @click="isExchangeStyledProcess && !isProxyExchangeProcess && !isBatchExchangeProcess && !isProxyReturnProcess ? emit('restartExchangeFromSlot') : emit('close')"
                   class="w-full py-4 rounded-xl bg-gray-900 text-white font-bold hover:bg-black transition-all shadow-lg mt-4"
                 >
                   {{ isExchangeStyledProcess ? '确认' : '确认并关闭' }}

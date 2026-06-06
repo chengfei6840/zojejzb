@@ -4,16 +4,19 @@ import { CreditCard, ScanFace, User, LockKeyhole, Camera, X, CircleX } from 'luc
 
 interface Props {
   open: boolean;
+  initialMode?: LoginMode;
 }
 
-const props = defineProps<Props>();
+type LoginMode = 'account' | 'face' | 'card';
+
+const props = withDefaults(defineProps<Props>(), {
+  initialMode: 'account',
+});
 
 const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'login'): void;
 }>();
-
-type LoginMode = 'account' | 'face' | 'card';
 
 const loginMode = ref<LoginMode>('account');
 const loginResult = ref<{ method: LoginMode } | null>(null);
@@ -23,9 +26,9 @@ const faceProcessing = ref(false);
 let faceTimer: ReturnType<typeof setTimeout> | null = null;
 
 const loginMethodLabels: Record<LoginMode, string> = {
-  account: '账号密码登录',
-  face: '刷脸登录',
-  card: '刷卡登录',
+  account: '账号密码验证',
+  face: '刷脸验证',
+  card: '刷卡验证',
 };
 
 const showLoginFailure = (method: LoginMode) => {
@@ -71,7 +74,7 @@ watch(
   () => props.open,
   (open) => {
     if (open) {
-      loginMode.value = 'account';
+      loginMode.value = props.initialMode;
       accountName.value = '管理员';
       accountPassword.value = '123456';
       faceProcessing.value = false;
@@ -129,7 +132,7 @@ watch(
                   {{ loginMethodLabels[loginResult.method] }}失败
                 </div>
                 <div class="login-result-message">
-                  身份验证未通过，请重新验证或切换其他登录方式
+                  身份验证未通过，请重新验证或切换其他验证方式
                 </div>
                 <div class="login-result-actions">
                   <button type="button" class="login-result-secondary" @click="resetLoginResult">重新验证</button>
@@ -153,25 +156,25 @@ watch(
                   </div>
                 </label>
 
-                <button type="button" class="login-confirm" @click="handleAccountLogin">登录</button>
+                <button type="button" class="login-confirm" @click="handleAccountLogin">确认</button>
                 <button type="button" class="login-failure-link" @click="showLoginFailure('account')">
                   模拟账号验证失败
                 </button>
 
                 <div class="login-alt-divider">
                   <span></span>
-                  <strong>其他登录</strong>
+                  <strong>其他验证方式</strong>
                   <span></span>
                 </div>
 
                 <div class="login-alt-row">
                   <button type="button" class="login-alt-link" @click="switchLoginMode('card')">
                     <CreditCard :size="32" :stroke-width="2.2" />
-                    <span>刷卡登录</span>
+                    <span>刷卡验证</span>
                   </button>
                   <button type="button" class="login-alt-link" @click="switchLoginMode('face')">
                     <ScanFace :size="32" :stroke-width="2.2" />
-                    <span>刷脸登录</span>
+                    <span>刷脸验证</span>
                   </button>
                 </div>
               </div>
@@ -199,18 +202,18 @@ watch(
 
                 <div class="login-alt-divider face-alt-divider">
                   <span></span>
-                  <strong>其他登录</strong>
+                  <strong>其他验证方式</strong>
                   <span></span>
                 </div>
 
                 <div class="login-alt-row">
                   <button type="button" class="login-alt-link" @click="switchLoginMode('account')">
                     <User :size="32" :stroke-width="2.2" />
-                    <span>账号密码登录</span>
+                    <span>账号密码验证</span>
                   </button>
                   <button type="button" class="login-alt-link" @click="switchLoginMode('card')">
                     <CreditCard :size="32" :stroke-width="2.2" />
-                    <span>刷卡登录</span>
+                    <span>刷卡验证</span>
                   </button>
                 </div>
               </div>
@@ -226,18 +229,18 @@ watch(
 
                 <div class="login-alt-divider face-alt-divider">
                   <span></span>
-                  <strong>其他登录</strong>
+                  <strong>其他验证方式</strong>
                   <span></span>
                 </div>
 
                 <div class="login-alt-row">
                   <button type="button" class="login-alt-link" @click="switchLoginMode('account')">
                     <User :size="32" :stroke-width="2.2" />
-                    <span>账号密码登录</span>
+                    <span>账号密码验证</span>
                   </button>
                   <button type="button" class="login-alt-link" @click="switchLoginMode('face')">
                     <ScanFace :size="32" :stroke-width="2.2" />
-                    <span>刷脸登录</span>
+                    <span>刷脸验证</span>
                   </button>
                 </div>
               </div>

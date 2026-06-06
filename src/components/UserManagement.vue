@@ -13,6 +13,7 @@ interface UserRecord {
   workshopId: string;
   teamId: string;
   roleId: string;
+  password: string;
   employeeCardId: string;
   facePhotoId: string;
   availableSlotIds: string[];
@@ -77,6 +78,7 @@ const users = ref<UserRecord[]>([
     workshopId: 'workshop-1',
     teamId: 'team-1',
     roleId: 'role-admin',
+    password: '123456',
     employeeCardId: 'CARD-100001',
     facePhotoId: 'FACE-user-admin',
     availableSlotIds: ['slot-1', 'slot-2', 'slot-3'],
@@ -93,6 +95,7 @@ const users = ref<UserRecord[]>([
     workshopId: 'workshop-1',
     teamId: 'team-1',
     roleId: 'role-operator',
+    password: '123456',
     employeeCardId: 'CARD-100002',
     facePhotoId: 'FACE-user-operator',
     availableSlotIds: ['slot-1', 'slot-4'],
@@ -120,6 +123,7 @@ const form = reactive({
   workshopId: workshops[0]?.id ?? '',
   teamId: teams[0]?.id ?? '',
   roleId: roles[0]?.id ?? '',
+  password: '',
   employeeCardId: '',
   facePhotoId: '',
   availableSlotIds: [needleSlots[0]?.id ?? ''].filter(Boolean),
@@ -175,6 +179,7 @@ const resetForm = () => {
   form.workshopId = workshops.find(workshop => workshop.factoryId === form.factoryId)?.id ?? '';
   form.teamId = teams.find(team => team.workshopId === form.workshopId)?.id ?? '';
   form.roleId = roles[0]?.id ?? '';
+  form.password = '';
   form.employeeCardId = '';
   form.facePhotoId = '';
   form.availableSlotIds = [needleSlots[0]?.id ?? ''].filter(Boolean);
@@ -193,8 +198,9 @@ const createTimeText = () => {
 const saveUser = () => {
   const username = form.username.trim();
   const phone = form.phone.trim();
+  const password = form.password.trim();
   const employeeCardId = form.employeeCardId.trim();
-  if (!username || !phone || !form.factoryId || !form.workshopId || !form.teamId || !form.roleId || !employeeCardId || !form.facePhotoId || form.availableSlotIds.length === 0 || form.sewingDeviceIds.length === 0 || form.needleIds.length === 0) {
+  if (!username || !phone || !password || !form.factoryId || !form.workshopId || !form.teamId || !form.roleId || !employeeCardId || !form.facePhotoId || form.availableSlotIds.length === 0 || form.sewingDeviceIds.length === 0 || form.needleIds.length === 0) {
     return;
   }
 
@@ -212,6 +218,7 @@ const saveUser = () => {
           workshopId: form.workshopId,
           teamId: form.teamId,
           roleId: form.roleId,
+          password,
           employeeCardId,
           facePhotoId: form.facePhotoId,
           availableSlotIds: [...form.availableSlotIds],
@@ -231,6 +238,7 @@ const saveUser = () => {
         workshopId: form.workshopId,
         teamId: form.teamId,
         roleId: form.roleId,
+        password,
         employeeCardId,
         facePhotoId: form.facePhotoId,
         availableSlotIds: [...form.availableSlotIds],
@@ -253,6 +261,7 @@ const startEdit = (user: UserRecord) => {
   form.workshopId = user.workshopId;
   form.teamId = user.teamId;
   form.roleId = user.roleId;
+  form.password = user.password;
   form.employeeCardId = user.employeeCardId;
   form.facePhotoId = user.facePhotoId;
   form.availableSlotIds = [...user.availableSlotIds];
@@ -355,6 +364,11 @@ const startFaceRecognition = () => {
         <label class="org-field">
           <span>手机号</span>
           <input v-model="form.phone" type="tel" placeholder="请输入手机号" />
+        </label>
+
+        <label class="org-field">
+          <span>密码</span>
+          <input v-model="form.password" type="password" placeholder="请输入密码" />
         </label>
 
         <div class="org-field">

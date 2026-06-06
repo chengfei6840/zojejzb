@@ -66,6 +66,8 @@ export type ProcessPhase =
   | 'vision_processing' 
   | 'recognition_failed'
   | 'wrapping'
+  | 'batch_exchange_continue'
+  | 'batch_exchange_place_needle'
   | 'quantity_input' 
   | 'dispensing' 
   | 'complete';

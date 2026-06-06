@@ -1,24 +1,21 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { Power, Search, User, Settings, BarChart3, RefreshCcw, Download, Plus, Trash2, PackageCheck, ChevronDown, Home } from 'lucide-vue-next';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { Power, Search, User, Settings, BarChart3, RefreshCcw, Download, Plus, Trash2, PackageCheck, ChevronDown, Home, Globe2, Check } from 'lucide-vue-next';
 import { cn } from '../lib/utils';
 import type { AppView } from '../types';
 
 interface Props {
   currentView: AppView;
-  userName?: string;
   activeAction?: string | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  userName: "管理员",
   activeAction: 'exchange',
 });
 
 const emit = defineEmits<{
   (e: 'viewChange', view: AppView): void;
   (e: 'action', action: string): void;
-  (e: 'login'): void;
 }>();
 
 const dashboardNavItems = [
@@ -38,6 +35,13 @@ const sectionNavItems = [
 ];
 
 const navItems = computed(() => props.currentView === 'dashboard' ? dashboardNavItems : sectionNavItems);
+const isLanguageMenuOpen = ref(false);
+const selectedLanguage = ref('zh-CN');
+
+const languageOptions = [
+  { label: '简体中文', value: 'zh-CN' },
+  { label: 'English', value: 'en-US' },
+];
 
 const isNavActive = (item: typeof dashboardNavItems[number] | typeof sectionNavItems[number]) => {
   if (props.currentView === 'dashboard') {
@@ -57,6 +61,30 @@ const handleNavClick = (item: typeof dashboardNavItems[number] | typeof sectionN
     emit('action', item.action);
   }
 };
+
+const toggleLanguageMenu = () => {
+  isLanguageMenuOpen.value = !isLanguageMenuOpen.value;
+};
+
+const selectLanguage = (language: string) => {
+  selectedLanguage.value = language;
+  isLanguageMenuOpen.value = false;
+};
+
+const closeLanguageMenu = (event: MouseEvent) => {
+  const target = event.target as HTMLElement | null;
+  if (!target?.closest('.language-switcher')) {
+    isLanguageMenuOpen.value = false;
+  }
+};
+
+onMounted(() => {
+  window.addEventListener('click', closeLanguageMenu);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('click', closeLanguageMenu);
+});
 </script>
 
 <template>
@@ -94,12 +122,38 @@ const handleNavClick = (item: typeof dashboardNavItems[number] | typeof sectionN
       </button>
     </nav>
 
-    <button type="button" class="user-block" @click="emit('login')">
-      <div class="avatar">
-        <User :size="23" />
+    <div class="language-switcher">
+      <button 
+        type="button" 
+        class="user-block" 
+        :class="isLanguageMenuOpen && 'open'"
+        :aria-expanded="isLanguageMenuOpen"
+        aria-haspopup="menu"
+        aria-label="切换语言"
+        @click.stop="toggleLanguageMenu"
+      >
+        <div class="avatar">
+          <User :size="23" />
+        </div>
+        <ChevronDown :size="20" :stroke-width="2.7" />
+      </button>
+
+      <div v-if="isLanguageMenuOpen" class="language-menu" role="menu">
+        <button
+          v-for="language in languageOptions"
+          :key="language.value"
+          type="button"
+          class="language-option"
+          :class="selectedLanguage === language.value && 'selected'"
+          role="menuitemradio"
+          :aria-checked="selectedLanguage === language.value"
+          @click="selectLanguage(language.value)"
+        >
+          <Globe2 :size="20" :stroke-width="2.2" />
+          <span>{{ language.label }}</span>
+          <Check v-if="selectedLanguage === language.value" :size="18" :stroke-width="2.8" />
+        </button>
       </div>
-      <span>{{ userName }}</span>
-      <ChevronDown :size="20" :stroke-width="2.7" />
-    </button>
+    </div>
   </header>
 </template>

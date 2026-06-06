@@ -57,18 +57,21 @@ interface ExchangeReportRow {
 
 const currentView = ref<AppView>('dashboard');
 type ProcessType = 'exchange' | 'return' | 'dispense' | null;
-type DispenseMode = 'direct' | 'authorized' | 'proxy' | 'proxyExchange' | 'proxyReturn' | null;
+type DispenseMode = 'direct' | 'authorized' | 'proxy' | 'proxyExchange' | 'batchExchange' | 'proxyReturn' | null;
 
 const activeProcess = ref<{type: ProcessType, phase: ProcessPhase}>({ type: 'exchange', phase: 'exchange_select_slot' });
 const slots = ref<NeedleSlot[]>(MOCK_SLOTS.map((slot) => ({ ...slot })));
 const selectedSlot = ref<NeedleSlot | null>(null);
 const selectedExchangeReason = ref('');
 const selectedReturnReason = ref('');
+const recognitionFailureTitle = ref('机针识别失败');
+const recognitionFailureMessage = ref('和所选针位的机针不匹配。');
 const dispenseQuantity = ref(1);
 const dispenseMode = ref<DispenseMode>(null);
 const authorizationUserDisplay = ref('');
 const selectedReport = ref<'exchange' | 'replenish' | 'dispense' | 'return' | 'spare'>('exchange');
 const isLoginOpen = ref(false);
+const pendingProtectedView = ref<AppView | null>(null);
 const managementModal = ref<AppView | null>(null);
 const exchangeCompleted = ref(false);
 const returnCompleted = ref(false);
@@ -89,13 +92,13 @@ const stats = computed(() => ({
 }));
 
 const visibleSlots = computed(() => slots.value.slice(0, 12));
-const headerUserName = computed(() => authorizationUserDisplay.value || '管理员');
 const dispenseFaceTitle = computed(() => {
   if (activeProcess.value.type !== 'dispense') return '身份验证';
   if (activeProcess.value.phase === 'dispense_authorized_face') return '被授权人身份验证';
   if (dispenseMode.value === 'authorized') return '授权人身份验证';
   if (dispenseMode.value === 'proxy') return '代领人身份验证';
   if (dispenseMode.value === 'proxyExchange') return '代换人身份验证';
+  if (dispenseMode.value === 'batchExchange') return '批量换针身份验证';
   if (dispenseMode.value === 'proxyReturn') return '代还人身份验证';
   return '身份验证';
 });
@@ -184,6 +187,49 @@ const updateSlotStatus = (count: number): NeedleSlot['status'] => {
   return 'available';
 };
 
+const normalizeNeedleField = (value?: string) => (value ?? '').trim().toLowerCase();
+
+const identifyNeedleForSelectedSlot = () => {
+  if (!selectedSlot.value) return null;
+
+  return {
+    needleType: selectedSlot.value.needleType,
+    needleNo: selectedSlot.value.needleNo,
+    needleTip: selectedSlot.value.needleTip,
+  };
+};
+
+const isRecognizedNeedleMatchedSelectedSlot = () => {
+  if (!selectedSlot.value) return false;
+
+  const recognizedNeedle = identifyNeedleForSelectedSlot();
+  if (!recognizedNeedle) return false;
+
+  return (
+    normalizeNeedleField(recognizedNeedle.needleType) === normalizeNeedleField(selectedSlot.value.needleType)
+    && normalizeNeedleField(recognizedNeedle.needleNo) === normalizeNeedleField(selectedSlot.value.needleNo)
+    && normalizeNeedleField(recognizedNeedle.needleTip) === normalizeNeedleField(selectedSlot.value.needleTip)
+  );
+};
+
+const failNeedleRecognitionMismatch = () => {
+  recognitionFailureTitle.value = '机针识别失败';
+  recognitionFailureMessage.value = '和所选针位的机针不匹配。';
+  activeProcess.value = { ...activeProcess.value, phase: 'recognition_failed' };
+};
+
+const isNeedleRecognitionMatchRequired = () => (
+  activeProcess.value.phase === 'vision_processing'
+  && (
+    activeProcess.value.type === 'exchange'
+    || activeProcess.value.type === 'return'
+    || (
+      activeProcess.value.type === 'dispense'
+      && ['proxyExchange', 'proxyReturn', 'batchExchange'].includes(dispenseMode.value ?? '')
+    )
+  )
+);
+
 const resetDispenseSelection = () => {
   selectedSlot.value = null;
   dispenseQuantity.value = 1;
@@ -228,6 +274,33 @@ const completeExchange = () => {
     status: 'COMPLETED',
   });
   exchangeCompleted.value = true;
+};
+
+const completeBatchExchange = () => {
+  if (!selectedSlot.value) return;
+
+  const nextSlots = slots.value.map((slot) => {
+    if (slot.id !== selectedSlot.value?.id) return slot;
+    const nextCount = Math.max(0, slot.count - 1);
+    return {
+      ...slot,
+      count: nextCount,
+      status: updateSlotStatus(nextCount),
+    };
+  });
+  slots.value = nextSlots;
+
+  const completedSlot = nextSlots.find((slot) => slot.id === selectedSlot.value?.id);
+  exchangeReports.value.unshift({
+    id: `batch-exchange-${Date.now()}`,
+    time: formatDateTime(new Date()),
+    user: '管理员',
+    slotNumber: completedSlot?.number ?? selectedSlot.value.number,
+    needleModel: `${completedSlot?.needleType ?? selectedSlot.value.needleType ?? ''} ${completedSlot?.needleNo ?? selectedSlot.value.needleNo ?? ''}`.trim(),
+    quantity: 1,
+    reason: selectedExchangeReason.value || '其他',
+    status: 'COMPLETED',
+  });
 };
 
 const completeReturn = () => {
@@ -282,6 +355,11 @@ const handleAction = (type: string) => {
 const handleNextPhase = () => {
   const { type, phase } = activeProcess.value;
 
+  if (isNeedleRecognitionMatchRequired() && !isRecognizedNeedleMatchedSelectedSlot()) {
+    failNeedleRecognitionMismatch();
+    return;
+  }
+
   if (type === 'exchange' || type === 'return') {
     const phaseOrder = type === 'exchange' ? EXCHANGE_PHASE_ORDER : RETURN_PHASE_ORDER;
     const idx = phaseOrder.indexOf(phase);
@@ -311,6 +389,10 @@ const handleNextPhase = () => {
       activeProcess.value = { type, phase: 'quantity_input' };
       return;
     }
+    if (phase === 'batch_exchange_place_needle') {
+      activeProcess.value = { type, phase: 'vision_processing' };
+      return;
+    }
   }
 
   const phases: ProcessPhase[] = [
@@ -327,6 +409,23 @@ const handleNextPhase = () => {
   let nextIdx = currentIdx + 1;
   
   if (type === 'dispense') {
+    if (dispenseMode.value === 'batchExchange') {
+      const batchExchangePhases: ProcessPhase[] = [
+        'select_reason',
+        'vision_processing',
+        'wrapping',
+        'dispensing',
+        'batch_exchange_continue',
+      ];
+      const batchExchangeIdx = batchExchangePhases.indexOf(phase);
+      if (batchExchangeIdx >= 0 && batchExchangeIdx < batchExchangePhases.length - 1) {
+        if (phase === 'dispensing') {
+          completeBatchExchange();
+        }
+        activeProcess.value = { ...activeProcess.value, phase: batchExchangePhases[batchExchangeIdx + 1] };
+        return;
+      }
+    }
     if (dispenseMode.value === 'proxyExchange' || dispenseMode.value === 'proxyReturn') {
       const proxyNeedlePhases: ProcessPhase[] = dispenseMode.value === 'proxyReturn'
         ? [
@@ -367,7 +466,7 @@ const handleNextPhase = () => {
   }
 };
 
-const onViewChange = (view: AppView) => {
+const applyViewChange = (view: AppView) => {
   currentView.value = view;
   managementModal.value = null;
   if (view === 'dashboard') {
@@ -385,6 +484,16 @@ const onViewChange = (view: AppView) => {
   returnCompleted.value = false;
 };
 
+const onViewChange = (view: AppView) => {
+  if (view === 'reporting' || view === 'management') {
+    pendingProtectedView.value = view;
+    isLoginOpen.value = true;
+    return;
+  }
+
+  applyViewChange(view);
+};
+
 const onSlotClick = (slot: NeedleSlot) => {
   if (currentView.value === 'dashboard' && activeProcess.value.type === 'dispense' && activeProcess.value.phase === 'dispense_ready') {
     selectedSlot.value = slot;
@@ -397,6 +506,8 @@ const onSlotClick = (slot: NeedleSlot) => {
           ? 'dispense_proxy_user_select'
           : dispenseMode.value === 'proxyExchange'
             ? 'dispense_proxy_user_select'
+            : dispenseMode.value === 'batchExchange'
+              ? 'select_reason'
             : dispenseMode.value === 'proxyReturn'
               ? 'dispense_proxy_user_select'
               : 'quantity_input',
@@ -430,8 +541,12 @@ const onProcessReasonSelect = (reason: string) => {
   selectedExchangeReason.value = reason;
 };
 
-const onDispenseOperationSelect = (operation: 'direct' | 'authorized' | 'proxy' | 'proxyExchange' | 'proxyReturn') => {
+const onDispenseOperationSelect = (operation: 'direct' | 'authorized' | 'proxy' | 'proxyExchange' | 'batchExchange' | 'proxyReturn') => {
   resetDispenseSelection();
+  selectedExchangeReason.value = '';
+  selectedReturnReason.value = '';
+  exchangeCompleted.value = false;
+  returnCompleted.value = false;
   authorizationUserDisplay.value = '';
   dispenseMode.value = operation;
   activeProcess.value = { type: 'dispense', phase: 'face_recognition' };
@@ -449,6 +564,13 @@ const onProxyUserConfirm = () => {
   activeProcess.value = {
     type: 'dispense',
     phase: dispenseMode.value === 'proxyExchange' || dispenseMode.value === 'proxyReturn' ? 'select_reason' : 'quantity_input',
+  };
+};
+
+const onBatchExchangeContinue = (shouldContinue: boolean) => {
+  activeProcess.value = {
+    type: 'dispense',
+    phase: shouldContinue ? 'batch_exchange_place_needle' : 'complete',
   };
 };
 
@@ -475,6 +597,8 @@ const closeProcess = () => {
       'select_reason',
       'vision_processing',
       'wrapping',
+      'batch_exchange_continue',
+      'batch_exchange_place_needle',
       'quantity_input',
       'dispensing',
       'complete',
@@ -496,6 +620,16 @@ const closeProcess = () => {
 
 const closeLogin = () => {
   isLoginOpen.value = false;
+  pendingProtectedView.value = null;
+};
+
+const completeProtectedViewLogin = () => {
+  const targetView = pendingProtectedView.value;
+  closeLogin();
+
+  if (targetView) {
+    applyViewChange(targetView);
+  }
 };
 
 const onSystemItemClick = (item: { view?: AppView }) => {
@@ -514,10 +648,8 @@ const closeManagementModal = () => {
     <Header 
       :current-view="currentView" 
       :active-action="activeProcess.type"
-      :user-name="headerUserName"
       @view-change="onViewChange" 
       @action="handleAction"
-      @login="isLoginOpen = true"
     />
 
     <main class="flex-1 overflow-hidden scrollbar-hide">
@@ -732,10 +864,13 @@ const closeManagementModal = () => {
       :type="activeProcess.type" 
       :selected-slot="selectedSlot"
       :selected-reason="selectedProcessReason"
+      :recognition-failure-title="recognitionFailureTitle"
+      :recognition-failure-message="recognitionFailureMessage"
       :dispense-quantity="dispenseQuantity"
       :dispense-face-title="dispenseFaceTitle"
       :proxy-user-select-title="proxyUserSelectTitle"
       :is-proxy-exchange="dispenseMode === 'proxyExchange'"
+      :is-batch-exchange="dispenseMode === 'batchExchange'"
       :is-proxy-return="dispenseMode === 'proxyReturn'"
       :slots="slots"
       :is-admin="true"
@@ -746,14 +881,16 @@ const closeManagementModal = () => {
       @dispense-quantity-change="dispenseQuantity = $event"
       @dispense-operation-select="onDispenseOperationSelect"
       @proxy-user-confirm="onProxyUserConfirm"
+      @batch-exchange-continue="onBatchExchangeContinue"
       @recognition-failed="onExchangeRecognitionFailed"
       @restart-exchange-from-slot="restartExchangeFromSlot"
     />
 
     <LoginModal
       :open="isLoginOpen"
+      initial-mode="face"
       @close="closeLogin"
-      @login="closeLogin"
+      @login="completeProtectedViewLogin"
     />
   </div>
 </template>
