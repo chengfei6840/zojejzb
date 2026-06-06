@@ -57,7 +57,7 @@ interface ExchangeReportRow {
 
 const currentView = ref<AppView>('dashboard');
 type ProcessType = 'exchange' | 'return' | 'dispense' | 'replenish' | 'clear' | null;
-type DispenseMode = 'direct' | 'authorized' | null;
+type DispenseMode = 'direct' | 'authorized' | 'proxy' | 'proxyExchange' | 'proxyReturn' | null;
 
 const activeProcess = ref<{type: ProcessType, phase: ProcessPhase}>({ type: 'exchange', phase: 'exchange_select_slot' });
 const slots = ref<NeedleSlot[]>(MOCK_SLOTS.map((slot) => ({ ...slot })));
@@ -94,8 +94,18 @@ const dispenseFaceTitle = computed(() => {
   if (activeProcess.value.type !== 'dispense') return '身份验证';
   if (activeProcess.value.phase === 'dispense_authorized_face') return '被授权人身份验证';
   if (dispenseMode.value === 'authorized') return '授权人身份验证';
+  if (dispenseMode.value === 'proxy') return '代领人身份验证';
+  if (dispenseMode.value === 'proxyExchange') return '代换人身份验证';
+  if (dispenseMode.value === 'proxyReturn') return '代还人身份验证';
   return '身份验证';
 });
+const proxyUserSelectTitle = computed(() => (
+  dispenseMode.value === 'proxyExchange'
+    ? '选择代换用户'
+    : dispenseMode.value === 'proxyReturn'
+      ? '选择代还用户'
+      : '选择代领用户'
+));
 const isNeedleReturnLikeProcess = computed(() => activeProcess.value.type === 'exchange' || activeProcess.value.type === 'return');
 const isNeedleReturnLikeSlotSelection = computed(() => (
   currentView.value === 'dashboard'
@@ -181,6 +191,8 @@ const resetDispenseSelection = () => {
 
 const resetDispenseSession = () => {
   resetDispenseSelection();
+  selectedExchangeReason.value = '';
+  selectedReturnReason.value = '';
   dispenseMode.value = null;
   authorizationUserDisplay.value = '';
 };
@@ -310,6 +322,33 @@ const handleNextPhase = () => {
   let nextIdx = currentIdx + 1;
   
   if (type === 'dispense') {
+    if (dispenseMode.value === 'proxyExchange' || dispenseMode.value === 'proxyReturn') {
+      const proxyNeedlePhases: ProcessPhase[] = dispenseMode.value === 'proxyReturn'
+        ? [
+            'select_reason',
+            'vision_processing',
+            'wrapping',
+            'complete',
+          ]
+        : [
+            'select_reason',
+            'vision_processing',
+            'wrapping',
+            'dispensing',
+            'complete',
+          ];
+      const proxyNeedleIdx = proxyNeedlePhases.indexOf(phase);
+      if (proxyNeedleIdx >= 0 && proxyNeedleIdx < proxyNeedlePhases.length - 1) {
+        if (phase === 'dispensing') {
+          completeExchange();
+        }
+        if (dispenseMode.value === 'proxyReturn' && phase === 'wrapping') {
+          completeReturn();
+        }
+        activeProcess.value = { ...activeProcess.value, phase: proxyNeedlePhases[proxyNeedleIdx + 1] };
+        return;
+      }
+    }
     if (phase === 'quantity_input') {
       nextIdx = phases.indexOf('dispensing');
     }
@@ -353,7 +392,15 @@ const onSlotClick = (slot: NeedleSlot) => {
     dispenseQuantity.value = slot.count > 0 ? 1 : 0;
     activeProcess.value = {
       type: 'dispense',
-      phase: dispenseMode.value === 'authorized' ? 'dispense_authorized_face' : 'quantity_input',
+      phase: dispenseMode.value === 'authorized'
+        ? 'dispense_authorized_face'
+        : dispenseMode.value === 'proxy'
+          ? 'dispense_proxy_user_select'
+          : dispenseMode.value === 'proxyExchange'
+            ? 'dispense_proxy_user_select'
+            : dispenseMode.value === 'proxyReturn'
+              ? 'dispense_proxy_user_select'
+              : 'quantity_input',
     };
     return;
   }
@@ -372,22 +419,38 @@ const onNeedleReturnLikeSelectSlot = (slot: NeedleSlot) => {
 
 const selectedProcessReason = computed(() => {
   if (activeProcess.value.type === 'return') return selectedReturnReason.value;
+  if (activeProcess.value.type === 'dispense' && dispenseMode.value === 'proxyReturn') return selectedReturnReason.value;
   return selectedExchangeReason.value;
 });
 
 const onProcessReasonSelect = (reason: string) => {
-  if (activeProcess.value.type === 'return') {
+  if (activeProcess.value.type === 'return' || (activeProcess.value.type === 'dispense' && dispenseMode.value === 'proxyReturn')) {
     selectedReturnReason.value = reason;
     return;
   }
   selectedExchangeReason.value = reason;
 };
 
-const onDispenseOperationSelect = (operation: 'direct' | 'authorized') => {
+const onDispenseOperationSelect = (operation: 'direct' | 'authorized' | 'proxy' | 'proxyExchange' | 'proxyReturn') => {
   resetDispenseSelection();
   authorizationUserDisplay.value = '';
   dispenseMode.value = operation;
   activeProcess.value = { type: 'dispense', phase: 'face_recognition' };
+};
+
+const onProxyUserConfirm = () => {
+  if (dispenseMode.value === 'proxyExchange') {
+    exchangeCompleted.value = false;
+    selectedExchangeReason.value = '';
+  }
+  if (dispenseMode.value === 'proxyReturn') {
+    returnCompleted.value = false;
+    selectedReturnReason.value = '';
+  }
+  activeProcess.value = {
+    type: 'dispense',
+    phase: dispenseMode.value === 'proxyExchange' || dispenseMode.value === 'proxyReturn' ? 'select_reason' : 'quantity_input',
+  };
 };
 
 const onExchangeRecognitionFailed = () => {
@@ -407,7 +470,16 @@ const closeProcess = () => {
     return;
   }
   if (currentView.value === 'dashboard' && activeProcess.value.type === 'dispense') {
-    const shouldReturnToDispensePage = ['dispense_authorized_face', 'quantity_input', 'dispensing', 'complete'].includes(activeProcess.value.phase);
+    const shouldReturnToDispensePage = [
+      'dispense_authorized_face',
+      'dispense_proxy_user_select',
+      'select_reason',
+      'vision_processing',
+      'wrapping',
+      'quantity_input',
+      'dispensing',
+      'complete',
+    ].includes(activeProcess.value.phase);
     resetDispenseSelection();
     activeProcess.value = { type: 'dispense', phase: shouldReturnToDispensePage ? 'dispense_ready' : 'idle' };
     return;
@@ -663,6 +735,9 @@ const closeManagementModal = () => {
       :selected-reason="selectedProcessReason"
       :dispense-quantity="dispenseQuantity"
       :dispense-face-title="dispenseFaceTitle"
+      :proxy-user-select-title="proxyUserSelectTitle"
+      :is-proxy-exchange="dispenseMode === 'proxyExchange'"
+      :is-proxy-return="dispenseMode === 'proxyReturn'"
       :slots="slots"
       :is-admin="true"
       @close="closeProcess"
@@ -671,6 +746,7 @@ const closeManagementModal = () => {
       @reason-select="onProcessReasonSelect"
       @dispense-quantity-change="dispenseQuantity = $event"
       @dispense-operation-select="onDispenseOperationSelect"
+      @proxy-user-confirm="onProxyUserConfirm"
       @recognition-failed="onExchangeRecognitionFailed"
       @restart-exchange-from-slot="restartExchangeFromSlot"
     />

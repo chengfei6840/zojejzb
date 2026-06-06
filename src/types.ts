@@ -59,6 +59,7 @@ export type ProcessPhase =
   | 'dispense_operation_select'
   | 'dispense_ready'
   | 'dispense_authorized_face'
+  | 'dispense_proxy_user_select'
   | 'face_recognition' 
   | 'select_equipment' 
   | 'select_reason' 

@@ -5,6 +5,14 @@ import type { NeedleSlot, ProcessPhase } from '../types';
 import { EXCHANGE_REASONS, RETURN_REASONS } from '../constants';
 import { cn } from '../lib/utils';
 
+interface ProxyUserOption {
+  id: string;
+  name: string;
+  phone: string;
+  role: string;
+  status: '启用' | '停用';
+}
+
 interface Props {
   phase: ProcessPhase;
   type: 'exchange' | 'return' | 'dispense' | 'replenish' | 'clear' | null;
@@ -13,6 +21,9 @@ interface Props {
   selectedReason?: string;
   dispenseQuantity?: number;
   dispenseFaceTitle?: string;
+  proxyUserSelectTitle?: string;
+  isProxyExchange?: boolean;
+  isProxyReturn?: boolean;
   isAdmin?: boolean;
 }
 
@@ -22,6 +33,9 @@ const props = withDefaults(defineProps<Props>(), {
   selectedReason: '',
   dispenseQuantity: 1,
   dispenseFaceTitle: '身份验证',
+  proxyUserSelectTitle: '选择代领用户',
+  isProxyExchange: false,
+  isProxyReturn: false,
   isAdmin: false,
 });
 
@@ -31,7 +45,8 @@ const emit = defineEmits<{
   (e: 'exchangeSelectSlot', slot: NeedleSlot): void;
   (e: 'reasonSelect', reason: string): void;
   (e: 'dispenseQuantityChange', quantity: number): void;
-  (e: 'dispenseOperationSelect', operation: 'direct' | 'authorized'): void;
+  (e: 'dispenseOperationSelect', operation: 'direct' | 'authorized' | 'proxy' | 'proxyExchange' | 'proxyReturn'): void;
+  (e: 'proxyUserConfirm', user: ProxyUserOption): void;
   (e: 'recognitionFailed'): void;
   (e: 'restartExchangeFromSlot'): void;
 }>();
@@ -43,9 +58,30 @@ const isReasonMaintenanceOpen = ref(false);
 const draftReason = ref('');
 const editingReason = ref('');
 const faceProcessing = ref(false);
+const proxyUserKeyword = ref('');
+const selectedProxyUserId = ref('');
 let faceTimer: ReturnType<typeof setTimeout> | null = null;
+const PROXY_NEEDLE_STYLE_PHASES: ProcessPhase[] = [
+  'select_reason',
+  'vision_processing',
+  'recognition_failed',
+  'wrapping',
+  'dispensing',
+  'complete',
+];
 const isNeedleReturnLikeProcess = computed(() => props.type === 'exchange' || props.type === 'return');
-const isReturnProcess = computed(() => props.type === 'return');
+const isProxyExchangeProcess = computed(() => (
+  props.type === 'dispense'
+  && props.isProxyExchange
+  && PROXY_NEEDLE_STYLE_PHASES.includes(props.phase)
+));
+const isProxyReturnProcess = computed(() => (
+  props.type === 'dispense'
+  && props.isProxyReturn
+  && PROXY_NEEDLE_STYLE_PHASES.includes(props.phase)
+));
+const isExchangeStyledProcess = computed(() => isNeedleReturnLikeProcess.value || isProxyExchangeProcess.value || isProxyReturnProcess.value);
+const isReturnProcess = computed(() => props.type === 'return' || isProxyReturnProcess.value);
 const processActionLabel = computed(() => isReturnProcess.value ? '还针' : '换针');
 const reasonOptions = computed(() => isReturnProcess.value ? returnReasonOptions.value : exchangeReasonOptions.value);
 const reasonPlaceholder = computed(() => `请选择${processActionLabel.value}原因`);
@@ -57,7 +93,8 @@ const currentSlotStock = computed(() => props.selectedSlot?.count ?? 0);
 const maxDispenseQuantity = computed(() => Math.max(0, currentSlotStock.value));
 const isDispenseQuietStep = computed(() => (
   props.type === 'dispense'
-  && ['quantity_input', 'dispensing', 'complete'].includes(props.phase)
+  && ['dispense_proxy_user_select', 'quantity_input', 'dispensing', 'complete'].includes(props.phase)
+  && !isProxyExchangeProcess.value
 ));
 const isLargeTitleStep = computed(() => simpleExchangeTitle.value || isDispenseQuietStep.value);
 const canConfirmDispenseQuantity = computed(() => (
@@ -69,11 +106,30 @@ const canConfirmDispenseQuantity = computed(() => (
 const dispenseOperationOptions = [
   { label: '直接领针', icon: Inbox, operation: 'direct' as const },
   { label: '授权领针', icon: User, operation: 'authorized' as const },
-  { label: '代领', icon: CreditCard, operation: null },
-  { label: '代换', icon: Wrench, operation: null },
+  { label: '代领', icon: CreditCard, operation: 'proxy' as const },
+  { label: '代换', icon: Wrench, operation: 'proxyExchange' as const },
   { label: '批量换针', icon: Upload, operation: null },
-  { label: '代还', icon: Repeat2, operation: null },
+  { label: '代还', icon: Repeat2, operation: 'proxyReturn' as const },
 ];
+
+const proxyUserOptions: ProxyUserOption[] = [
+  { id: 'user-1', name: '张三', phone: '13800001111', role: '车缝工', status: '启用' },
+  { id: 'user-2', name: '李四', phone: '13800002222', role: '组长', status: '启用' },
+  { id: 'user-3', name: '王五', phone: '13800003333', role: '机修员', status: '启用' },
+  { id: 'user-4', name: '赵六', phone: '13800004444', role: '质检员', status: '停用' },
+  { id: 'user-5', name: '陈七', phone: '13800005555', role: '车间主管', status: '启用' },
+];
+
+const filteredProxyUsers = computed(() => {
+  const keyword = proxyUserKeyword.value.trim().toLowerCase();
+  if (!keyword) return proxyUserOptions;
+  return proxyUserOptions.filter((user) => (
+    user.name.toLowerCase().includes(keyword)
+    || user.phone.includes(keyword)
+  ));
+});
+
+const selectedProxyUser = computed(() => proxyUserOptions.find((user) => user.id === selectedProxyUserId.value) ?? null);
 
 const EXCHANGE_SIMPLE_TITLES: Partial<Record<ProcessPhase, string>> = {
   vision_processing: '机针识别',
@@ -83,7 +139,7 @@ const EXCHANGE_SIMPLE_TITLES: Partial<Record<ProcessPhase, string>> = {
 };
 
 const simpleExchangeTitle = computed(() => {
-  if (!isNeedleReturnLikeProcess.value) return '';
+  if (!isExchangeStyledProcess.value) return '';
   if (isReturnProcess.value && props.phase === 'complete') return '还针完成';
   return EXCHANGE_SIMPLE_TITLES[props.phase] ?? '';
 });
@@ -110,7 +166,7 @@ const RETURN_STEP_LABELS: Partial<Record<ProcessPhase, string>> = {
 };
 
 const exchangeDisplayStep = computed(() => {
-  if (!isNeedleReturnLikeProcess.value) return null;
+  if (!isExchangeStyledProcess.value) return null;
   const map: Partial<Record<ProcessPhase, number>> = {
     exchange_select_slot: 3,
     exchange_face_secondary: 4,
@@ -127,7 +183,9 @@ const exchangeDisplayStep = computed(() => {
 const getTitle = () => {
   if (props.type === 'dispense' && props.phase === 'quantity_input') return '领针数量';
   if (props.type === 'dispense' && props.phase === 'dispensing') return '正在出针';
-  if (props.type === 'dispense' && props.phase === 'complete') return '出针完成';
+  if (props.type === 'dispense' && props.phase === 'complete') return isProxyReturnProcess.value ? '还针完成' : '出针完成';
+  if (props.type === 'dispense' && props.phase === 'select_reason') return isProxyReturnProcess.value ? '还针原因' : '换针原因';
+  if (props.type === 'dispense' && props.phase === 'dispense_proxy_user_select') return props.proxyUserSelectTitle;
   switch (props.type) {
     case 'exchange': return '换针流程';
     case 'return': return '还针流程';
@@ -138,6 +196,12 @@ const getTitle = () => {
 };
 
 const getStepDescription = () => {
+  if (isProxyExchangeProcess.value && EXCHANGE_STEP_LABELS[props.phase]) {
+    return EXCHANGE_STEP_LABELS[props.phase]!;
+  }
+  if (isProxyReturnProcess.value && RETURN_STEP_LABELS[props.phase]) {
+    return RETURN_STEP_LABELS[props.phase]!;
+  }
   if (props.type === 'exchange' && EXCHANGE_STEP_LABELS[props.phase]) {
     return EXCHANGE_STEP_LABELS[props.phase]!;
   }
@@ -152,6 +216,7 @@ const getStepDescription = () => {
     case 'vision_processing': return '视觉检测';
     case 'quantity_input': return '输入数量';
     case 'dispensing': return '发放处理';
+    case 'dispense_proxy_user_select': return '选择用户';
     default: return '进行中';
   }
 };
@@ -212,6 +277,11 @@ const handleDispenseQuantityInput = (event: Event) => {
   updateDispenseQuantity(Number((event.target as HTMLInputElement).value));
 };
 
+const confirmProxyUser = () => {
+  if (!selectedProxyUser.value) return;
+  emit('proxyUserConfirm', selectedProxyUser.value);
+};
+
 const stopFaceRecognition = () => {
   faceProcessing.value = false;
   if (faceTimer) {
@@ -270,6 +340,13 @@ watch(() => props.type, () => {
   isReasonMaintenanceOpen.value = false;
   editingReason.value = '';
   draftReason.value = '';
+});
+
+watch(() => props.phase, (newPhase) => {
+  if (newPhase === 'dispense_proxy_user_select') {
+    proxyUserKeyword.value = '';
+    selectedProxyUserId.value = '';
+  }
 });
 </script>
 
@@ -455,7 +532,7 @@ watch(() => props.type, () => {
           </section>
 
           <section
-            v-else-if="isNeedleReturnLikeProcess && phase === 'select_reason'"
+            v-else-if="isExchangeStyledProcess && phase === 'select_reason'"
             class="login-modal-card"
             role="dialog"
             aria-modal="true"
@@ -583,7 +660,7 @@ watch(() => props.type, () => {
                   <h2 :class="isLargeTitleStep ? 'text-[30px] font-normal text-gray-900 leading-none' : 'text-lg font-black text-gray-900 leading-tight'">
                     {{ simpleExchangeTitle || getTitle() }}
                   </h2>
-                  <p v-if="!isLargeTitleStep && !isNeedleReturnLikeProcess" class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                  <p v-if="!isLargeTitleStep && !isExchangeStyledProcess" class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
                     <template v-if="exchangeDisplayStep !== null">第 {{ exchangeDisplayStep }} / 7 步 · </template>{{ getStepDescription() }}
                   </p>
                 </div>
@@ -659,6 +736,62 @@ watch(() => props.type, () => {
                   </div>
                   <span class="text-xs font-black text-gray-700 tracking-tight">{{ label }}</span>
                 </button>
+              </div>
+
+              <!-- Proxy User Selection -->
+              <div v-else-if="phase === 'dispense_proxy_user_select'" class="flex flex-col gap-5 py-1">
+                <div class="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                  <input
+                    v-model="proxyUserKeyword"
+                    type="text"
+                    placeholder="按用户名或手机号查询"
+                    class="h-14 w-full rounded-xl border-2 border-gray-100 bg-white px-5 text-lg font-bold text-gray-700 outline-none focus:border-[var(--color-zoje-green)]"
+                  />
+                </div>
+
+                <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white">
+                  <div class="grid grid-cols-[1fr_1.4fr_1fr_0.8fr] bg-gray-50 px-5 py-3 text-sm font-black text-gray-400">
+                    <span>用户名</span>
+                    <span>手机号</span>
+                    <span>角色</span>
+                    <span class="text-right">状态</span>
+                  </div>
+                  <div class="max-h-[300px] overflow-y-auto">
+                    <button
+                      v-for="user in filteredProxyUsers"
+                      :key="user.id"
+                      type="button"
+                      @click="selectedProxyUserId = user.id"
+                      :class="cn(
+                        'grid w-full grid-cols-[1fr_1.4fr_1fr_0.8fr] items-center px-5 py-4 text-left text-base font-bold transition-all border-t border-gray-50',
+                        selectedProxyUserId === user.id
+                          ? 'bg-green-50 text-[var(--color-zoje-green)]'
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      )"
+                    >
+                      <span>{{ user.name }}</span>
+                      <span>{{ user.phone }}</span>
+                      <span>{{ user.role }}</span>
+                      <span :class="cn('text-right', user.status === '启用' ? 'text-green-600' : 'text-gray-400')">{{ user.status }}</span>
+                    </button>
+                    <div v-if="filteredProxyUsers.length === 0" class="px-5 py-10 text-center text-base font-bold text-gray-400">
+                      未查询到匹配用户
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <button @click="emit('close')" class="py-4 rounded-xl bg-gray-100 text-gray-500 font-bold hover:bg-gray-200 transition-all">
+                    返回
+                  </button>
+                  <button
+                    :disabled="!selectedProxyUser"
+                    @click="confirmProxyUser"
+                    class="py-4 rounded-xl bg-[var(--color-zoje-green)] text-white font-black shadow-lg hover:brightness-105 active:scale-[0.98] transition-all disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
+                  >
+                    确定
+                  </button>
+                </div>
               </div>
 
               <!-- Quantity Input -->
@@ -737,7 +870,7 @@ watch(() => props.type, () => {
                     <option v-for="reason in reasonOptions" :key="reason" :value="reason">{{ reason }}</option>
                   </select>
                   <button
-                    v-if="isNeedleReturnLikeProcess && isAdmin"
+                    v-if="isExchangeStyledProcess && isAdmin"
                     type="button"
                     @click="isReasonMaintenanceOpen = true"
                     class="px-4 rounded-xl border-2 border-gray-100 bg-gray-50 text-sm font-black text-gray-700 hover:border-[var(--color-zoje-green)] hover:text-[var(--color-zoje-green)]"
@@ -747,7 +880,7 @@ watch(() => props.type, () => {
                 </div>
                 <button
                   type="button"
-                  :disabled="isNeedleReturnLikeProcess && !selectedReason"
+                    :disabled="isExchangeStyledProcess && !selectedReason"
                   @click="emit('next')"
                   class="w-full py-4 rounded-xl bg-[var(--color-zoje-green)] text-white font-bold hover:brightness-110 active:scale-95 transition-all shadow-lg disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
                 >
@@ -766,7 +899,7 @@ watch(() => props.type, () => {
                 </div>
                 <div class="flex flex-col items-center gap-2">
                   <h3 class="text-xl font-black text-gray-800">正在识别机针</h3>
-                  <p v-if="!isNeedleReturnLikeProcess" class="text-gray-500 font-medium">请保持机针位于回收口识别区域</p>
+                  <p v-if="!isExchangeStyledProcess" class="text-gray-500 font-medium">请保持机针位于回收口识别区域</p>
                 </div>
               </div>
 
@@ -777,7 +910,7 @@ watch(() => props.type, () => {
                 </div>
                 <div class="text-center">
                   <h3 class="text-2xl font-black text-gray-800">未识别到机针</h3>
-                  <p v-if="!isNeedleReturnLikeProcess" class="text-gray-500 mt-2 leading-relaxed">
+                  <p v-if="!isExchangeStyledProcess" class="text-gray-500 mt-2 leading-relaxed">
                     请将机针放入回收口，放入机针后再重新从第三步（选择针位）开始操作。
                   </p>
                 </div>
@@ -811,7 +944,7 @@ watch(() => props.type, () => {
                 </div>
                 <div class="flex flex-col items-center gap-2">
                   <h3 class="text-2xl font-black text-gray-800">{{ type === 'return' ? '正在包针' : '正在出针' }}</h3>
-                  <p v-if="type !== 'exchange'" class="text-gray-500 font-medium text-center px-2">
+                  <p v-if="!isExchangeStyledProcess" class="text-gray-500 font-medium text-center px-2">
                     {{ type === 'dispense' ? '系统正在按领针数量出针' : '请从取针口领取新机针' }}
                   </p>
                 </div>
@@ -827,24 +960,24 @@ watch(() => props.type, () => {
                 </div>
                 <div class="text-center">
                   <h3 class="text-2xl font-black text-gray-800">
-                    {{ type === 'exchange' || type === 'dispense' ? '请从取针口取针' : type === 'return' ? '还针完成' : '操作成功' }}
+                    {{ type === 'return' || isProxyReturnProcess ? '还针完成' : type === 'exchange' || type === 'dispense' ? '请从取针口取针' : '操作成功' }}
                   </h3>
-                  <p v-if="!isNeedleReturnLikeProcess" class="text-gray-500 mt-2">
+                  <p v-if="!isExchangeStyledProcess" class="text-gray-500 mt-2">
                     {{ type === 'dispense' ? '出针完成，当前针位库存已更新。' : type === 'return' ? '还针已完成。' : '库存已更新，请关闭弹窗' }}
                   </p>
                 </div>
                 <button
-                  @click="isNeedleReturnLikeProcess ? emit('restartExchangeFromSlot') : emit('close')"
+                  @click="isExchangeStyledProcess && !isProxyExchangeProcess && !isProxyReturnProcess ? emit('restartExchangeFromSlot') : emit('close')"
                   class="w-full py-4 rounded-xl bg-gray-900 text-white font-bold hover:bg-black transition-all shadow-lg mt-4"
                 >
-                  {{ isNeedleReturnLikeProcess ? '确认' : '确认并关闭' }}
+                  {{ isExchangeStyledProcess ? '确认' : '确认并关闭' }}
                 </button>
               </div>
 
             </div>
 
             <!-- Modal Footer Info -->
-            <div v-if="!isLargeTitleStep && !isNeedleReturnLikeProcess" class="bg-green-50 px-8 py-3 flex items-center gap-2 border-t border-green-100">
+            <div v-if="!isLargeTitleStep && !isExchangeStyledProcess" class="bg-green-50 px-8 py-3 flex items-center gap-2 border-t border-green-100">
               <Info :size="14" class="text-[var(--color-zoje-green)]" />
               <span class="text-[10px] font-bold text-[var(--color-zoje-green)] uppercase tracking-wide">
                 系统将根据传感器与视觉模块实时反馈自动执行下一步
