@@ -57,7 +57,7 @@ const isNavActive = (item: NavItem) => {
   if (props.currentView === 'dashboard') {
     return Boolean(item.action && item.action === props.activeAction);
   }
-  if (item.view === 'management' && ['needle', 'needlePosition', 'organization', 'role', 'user'].includes(props.currentView)) {
+  if (item.view === 'management' && ['needle', 'needlePosition', 'organization', 'role', 'user', 'componentStatus'].includes(props.currentView)) {
     return true;
   }
   return item.view === props.currentView;

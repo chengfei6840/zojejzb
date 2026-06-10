@@ -49,7 +49,18 @@ export interface NeedlePositionRecord {
   vibrationMaxTime: number;
 }
 
-export type AppView = 'dashboard' | 'management' | 'needle' | 'needlePosition' | 'organization' | 'role' | 'user' | 'reporting';
+export type ComponentStatus = '正常' | '离线' | '故障' | '升级中';
+
+export interface DeviceComponentRecord {
+  id: string;
+  name: string;
+  address: string;
+  type: '储针部件' | '集中控制器' | '包针部件' | '人脸识别部件' | '打印部件';
+  status: ComponentStatus;
+  version: string;
+}
+
+export type AppView = 'dashboard' | 'management' | 'needle' | 'needlePosition' | 'organization' | 'role' | 'user' | 'componentStatus' | 'faceRecognition' | 'needleRecognition' | 'needleBoxDebugging' | 'controllerDebugging' | 'reporting';
 
 export type ProcessPhase = 
   | 'idle' 

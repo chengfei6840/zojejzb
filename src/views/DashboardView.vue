@@ -40,6 +40,11 @@ import NeedlePositionManagement from '../components/NeedlePositionManagement.vue
 import OrganizationManagement from '../components/OrganizationManagement.vue';
 import RoleManagement from '../components/RoleManagement.vue';
 import UserManagement from '../components/UserManagement.vue';
+import ComponentStatusManagement from '../components/ComponentStatusManagement.vue';
+import FaceRecognitionDebug from '../components/FaceRecognitionDebug.vue';
+import NeedleBoxDebug from '../components/NeedleBoxDebug.vue';
+import NeedleRecognitionDebug from '../components/NeedleRecognitionDebug.vue';
+import ControllerDebug from '../components/ControllerDebug.vue';
 import { EXCHANGE_REASONS, MOCK_SLOTS, RETURN_REASONS } from '../constants';
 import { messages, normalizeSupportedLocale } from '../i18n';
 import type { AppView, NeedleSlot, ProcessPhase } from '../types';
@@ -144,13 +149,12 @@ const managementSections = computed(() => [
   {
     title: t.value.management.deviceDebugging,
     items: [
-      { label: t.value.management.componentStatus, icon: FileCog, active: true },
-      { label: t.value.management.faceRecognition, icon: ScanFace },
-      { label: t.value.management.needleRecognition, icon: ScanLine },
-      { label: t.value.management.needleBoxDebugging, icon: PackageOpen },
-      { label: t.value.management.controllerDebugging, icon: SlidersHorizontal },
+      { label: t.value.management.componentStatus, icon: FileCog, view: 'componentStatus' as AppView },
+      { label: t.value.management.faceRecognition, icon: ScanFace, view: 'faceRecognition' as AppView },
+      { label: t.value.management.needleRecognition, icon: ScanLine, view: 'needleRecognition' as AppView },
+      { label: t.value.management.needleBoxDebugging, icon: PackageOpen, view: 'needleBoxDebugging' as AppView },
+      { label: t.value.management.controllerDebugging, icon: SlidersHorizontal, view: 'controllerDebugging' as AppView },
       { label: t.value.management.mediaSettings, icon: CirclePlay },
-      { label: t.value.management.languageSettings, icon: Globe2 },
       { label: t.value.management.basicParameterSettings, icon: FileCog },
       { label: t.value.management.printSettings, icon: Printer },
       { label: t.value.management.loginSettings, icon: User },
@@ -864,6 +868,11 @@ const closeManagementModal = () => {
           <NeedlePositionManagement v-else-if="managementModal === 'needlePosition'" />
           <RoleManagement v-else-if="managementModal === 'role'" />
           <UserManagement v-else-if="managementModal === 'user'" />
+          <ComponentStatusManagement v-else-if="managementModal === 'componentStatus'" />
+          <FaceRecognitionDebug v-else-if="managementModal === 'faceRecognition'" />
+          <NeedleRecognitionDebug v-else-if="managementModal === 'needleRecognition'" />
+          <NeedleBoxDebug v-else-if="managementModal === 'needleBoxDebugging'" />
+          <ControllerDebug v-else-if="managementModal === 'controllerDebugging'" />
         </div>
       </section>
     </div>
