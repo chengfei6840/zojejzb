@@ -88,7 +88,7 @@ export const messages = {
       languageSettings: '语言设置',
       basicParameterSettings: '基础参数设置',
       printSettings: '打印设置',
-      loginSettings: '登陆设置',
+      loginSettings: '登录设置',
       fragmentLossHandling: '异常针碎片丢失处理',
       exchangeTimeSettings: '换针时间设置',
       other: '其他',

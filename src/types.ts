@@ -60,7 +60,7 @@ export interface DeviceComponentRecord {
   version: string;
 }
 
-export type AppView = 'dashboard' | 'management' | 'needle' | 'needlePosition' | 'organization' | 'role' | 'user' | 'componentStatus' | 'faceRecognition' | 'needleRecognition' | 'needleBoxDebugging' | 'controllerDebugging' | 'reporting';
+export type AppView = 'dashboard' | 'management' | 'needle' | 'needlePosition' | 'organization' | 'role' | 'user' | 'componentStatus' | 'faceRecognition' | 'needleRecognition' | 'needleBoxDebugging' | 'controllerDebugging' | 'mediaSettings' | 'basicParameterSettings' | 'printSettings' | 'loginSettings' | 'fragmentLossHandling' | 'exchangeTimeSettings' | 'about' | 'reporting';
 
 export type ProcessPhase = 
   | 'idle' 

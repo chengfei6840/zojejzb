@@ -45,6 +45,13 @@ import FaceRecognitionDebug from '../components/FaceRecognitionDebug.vue';
 import NeedleBoxDebug from '../components/NeedleBoxDebug.vue';
 import NeedleRecognitionDebug from '../components/NeedleRecognitionDebug.vue';
 import ControllerDebug from '../components/ControllerDebug.vue';
+import MediaSettings from '../components/MediaSettings.vue';
+import BasicParameterSettings from '../components/BasicParameterSettings.vue';
+import PrintSettings from '../components/PrintSettings.vue';
+import LoginSettings from '../components/LoginSettings.vue';
+import FragmentLossHandlingSettings from '../components/FragmentLossHandlingSettings.vue';
+import ExchangeTimeSettings from '../components/ExchangeTimeSettings.vue';
+import AboutSystem from '../components/AboutSystem.vue';
 import { EXCHANGE_REASONS, MOCK_SLOTS, RETURN_REASONS } from '../constants';
 import { messages, normalizeSupportedLocale } from '../i18n';
 import type { AppView, NeedleSlot, ProcessPhase } from '../types';
@@ -81,6 +88,7 @@ const selectedReport = ref<'exchange' | 'replenish' | 'dispense' | 'return' | 's
 const isLoginOpen = ref(false);
 const pendingProtectedView = ref<AppView | null>(null);
 const managementModal = ref<AppView | null>(null);
+const isExitConfirmOpen = ref(false);
 const exchangeCompleted = ref(false);
 const returnCompleted = ref(false);
 const exchangeReports = ref<ExchangeReportRow[]>([
@@ -154,19 +162,19 @@ const managementSections = computed(() => [
       { label: t.value.management.needleRecognition, icon: ScanLine, view: 'needleRecognition' as AppView },
       { label: t.value.management.needleBoxDebugging, icon: PackageOpen, view: 'needleBoxDebugging' as AppView },
       { label: t.value.management.controllerDebugging, icon: SlidersHorizontal, view: 'controllerDebugging' as AppView },
-      { label: t.value.management.mediaSettings, icon: CirclePlay },
-      { label: t.value.management.basicParameterSettings, icon: FileCog },
-      { label: t.value.management.printSettings, icon: Printer },
-      { label: t.value.management.loginSettings, icon: User },
-      { label: t.value.management.fragmentLossHandling, icon: AlertTriangle },
-      { label: t.value.management.exchangeTimeSettings, icon: RotateCw },
+      { label: t.value.management.mediaSettings, icon: CirclePlay, view: 'mediaSettings' as AppView },
+      { label: t.value.management.basicParameterSettings, icon: FileCog, view: 'basicParameterSettings' as AppView },
+      { label: t.value.management.printSettings, icon: Printer, view: 'printSettings' as AppView },
+      { label: t.value.management.loginSettings, icon: User, view: 'loginSettings' as AppView },
+      { label: t.value.management.fragmentLossHandling, icon: AlertTriangle, view: 'fragmentLossHandling' as AppView },
+      { label: t.value.management.exchangeTimeSettings, icon: RotateCw, view: 'exchangeTimeSettings' as AppView },
     ],
   },
   {
     title: t.value.management.other,
     items: [
-      { label: t.value.management.about, icon: Info },
-      { label: t.value.management.exitSystem, icon: LogOut, danger: true },
+      { label: t.value.management.about, icon: Info, view: 'about' as AppView },
+      { label: t.value.management.exitSystem, icon: LogOut, action: 'exit' as const, danger: true },
     ],
   },
 ]);
@@ -649,7 +657,11 @@ const completeProtectedViewLogin = () => {
   }
 };
 
-const onSystemItemClick = (item: { view?: AppView }) => {
+const onSystemItemClick = (item: { view?: AppView, action?: 'exit' }) => {
+  if (item.action === 'exit') {
+    isExitConfirmOpen.value = true;
+    return;
+  }
   if (item.view) {
     managementModal.value = item.view;
   }
@@ -657,6 +669,15 @@ const onSystemItemClick = (item: { view?: AppView }) => {
 
 const closeManagementModal = () => {
   managementModal.value = null;
+};
+
+const closeExitConfirm = () => {
+  isExitConfirmOpen.value = false;
+};
+
+const confirmExitSystem = () => {
+  closeExitConfirm();
+  applyViewChange('dashboard');
 };
 </script>
 
@@ -858,7 +879,7 @@ const closeManagementModal = () => {
     </main>
 
     <div v-if="managementModal" class="management-modal-layer">
-      <section class="management-modal-card">
+      <section :class="['management-modal-card', managementModal === 'about' && 'about-modal-card']">
         <button type="button" class="management-modal-close" @click="closeManagementModal">
           <X :size="32" :stroke-width="2.2" />
         </button>
@@ -873,6 +894,27 @@ const closeManagementModal = () => {
           <NeedleRecognitionDebug v-else-if="managementModal === 'needleRecognition'" />
           <NeedleBoxDebug v-else-if="managementModal === 'needleBoxDebugging'" />
           <ControllerDebug v-else-if="managementModal === 'controllerDebugging'" />
+          <MediaSettings v-else-if="managementModal === 'mediaSettings'" />
+          <BasicParameterSettings v-else-if="managementModal === 'basicParameterSettings'" />
+          <PrintSettings v-else-if="managementModal === 'printSettings'" />
+          <LoginSettings v-else-if="managementModal === 'loginSettings'" />
+          <FragmentLossHandlingSettings v-else-if="managementModal === 'fragmentLossHandling'" />
+          <ExchangeTimeSettings v-else-if="managementModal === 'exchangeTimeSettings'" />
+          <AboutSystem v-else-if="managementModal === 'about'" />
+        </div>
+      </section>
+    </div>
+
+    <div v-if="isExitConfirmOpen" class="exit-confirm-layer">
+      <section class="exit-confirm-card">
+        <div class="exit-confirm-icon">
+          <LogOut :size="34" :stroke-width="2.3" />
+        </div>
+        <h2>确认退出系统吗？</h2>
+        <p>退出后将返回首页，当前系统页面操作会结束。</p>
+        <div class="exit-confirm-actions">
+          <button type="button" class="org-secondary-btn" @click="closeExitConfirm">取消</button>
+          <button type="button" class="org-primary-btn danger-solid" @click="confirmExitSystem">确认退出</button>
         </div>
       </section>
     </div>

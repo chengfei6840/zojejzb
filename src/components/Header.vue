@@ -57,7 +57,25 @@ const isNavActive = (item: NavItem) => {
   if (props.currentView === 'dashboard') {
     return Boolean(item.action && item.action === props.activeAction);
   }
-  if (item.view === 'management' && ['needle', 'needlePosition', 'organization', 'role', 'user', 'componentStatus'].includes(props.currentView)) {
+  if (
+    item.view === 'management'
+    && [
+      'needle',
+      'needlePosition',
+      'organization',
+      'role',
+      'user',
+      'componentStatus',
+      'faceRecognition',
+      'needleRecognition',
+      'needleBoxDebugging',
+      'controllerDebugging',
+      'mediaSettings',
+      'basicParameterSettings',
+      'printSettings',
+      'loginSettings',
+    ].includes(props.currentView)
+  ) {
     return true;
   }
   return item.view === props.currentView;

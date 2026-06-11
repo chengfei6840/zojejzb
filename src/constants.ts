@@ -2,6 +2,12 @@ import { NeedleSlot } from './types';
 
 const SEWING_MACHINE_IMAGE = `${import.meta.env.BASE_URL}assets/sewing-machine-wide.png`;
 
+export const APP_RELEASE_INFO = {
+  name: '机针云掌柜控制系统',
+  version: 'V0.0.0',
+  releaseDate: '2026-06-11',
+} as const;
+
 export const MOCK_SLOTS: NeedleSlot[] = Array.from({ length: 30 }, (_, i) => {
   const num = (i + 1).toString().padStart(2, '0');
   const screenshotCounts = [28, 16, 3, 0, 23, 24, 2, 0, 18, 17, 7, 0];
